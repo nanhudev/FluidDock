@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   deploy:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Build static website
-        shell: powershell
+        shell: pwsh
         run: .\tools\build-website.ps1 -BaseUrl 'https://nanhudev.github.io/dockbot'
       - uses: actions/upload-pages-artifact@v3
         with:
