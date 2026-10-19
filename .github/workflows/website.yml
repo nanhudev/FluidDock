@@ -1,0 +1,30 @@
+name: Website
+on:
+  push:
+    branches: [main]
+    paths: ['website/**', 'docs/media/**', 'assets/buddy.svg', 'tools/build-website.ps1', '.github/workflows/website.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: website
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: windows-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Build static website
+        shell: powershell
+        run: .\tools\build-website.ps1 -BaseUrl 'https://nanhudev.github.io/dockbot'
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/website
+      - uses: actions/deploy-pages@v4
+        id: deployment
