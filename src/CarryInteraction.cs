@@ -28,7 +28,8 @@ public sealed class CarryOverlay:Window {
     [DllImport("user32.dll")]static extern int GetWindowLong(IntPtr h,int index);
     [DllImport("user32.dll")]static extern int SetWindowLong(IntPtr h,int index,int value);
     readonly Dock dock;readonly Entry entry;Canvas canvas;Grid cargo;BuddyFace buddy;TranslateTransform cargoMove=new TranslateTransform(),buddyMove=new TranslateTransform();ScaleTransform scale=new ScaleTransform(1,1);RotateTransform tilt=new RotateTransform();
-    Point position,target,velocity;Stopwatch clock=Stopwatch.StartNew();double last;bool animating,discard;
+    Point position,target,velocity,demoStart;Stopwatch clock=Stopwatch.StartNew();double last,demoAge;bool animating,discard;
+    public Rect CaptureBounds {get{return new Rect(position.X-35,position.Y-65,110,110);}}
     public CarryOverlay(Dock owner,Entry app,Point start){
         dock=owner;entry=app;Owner=owner;WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;AllowsTransparency=true;Background=Brushes.Transparent;ShowInTaskbar=false;ShowActivated=false;Topmost=true;IsHitTestVisible=false;
         Left=SystemParameters.VirtualScreenLeft;Top=SystemParameters.VirtualScreenTop;Width=SystemParameters.VirtualScreenWidth;Height=SystemParameters.VirtualScreenHeight;
@@ -36,11 +37,21 @@ public sealed class CarryOverlay:Window {
         var tg=new TransformGroup();tg.Children.Add(scale);tg.Children.Add(cargoMove);cargo.RenderTransform=tg;canvas.Children.Add(cargo);
         buddy=new BuddyFace();var bg=new TransformGroup();bg.Children.Add(tilt);bg.Children.Add(buddyMove);buddy.RenderTransform=bg;buddy.RenderTransformOrigin=new Point(.5,.5);canvas.Children.Add(buddy);
         SourceInitialized+=(s,e)=>{var h=new WindowInteropHelper(this).Handle;SetWindowLong(h,-20,GetWindowLong(h,-20)|0x20|0x80|0x08000000);};
-        Show();position=PointFromScreen(start);Position(position);Closed+=(s,e)=>{if(animating)CompositionTarget.Rendering-=Frame;};
+        Show();position=PointFromScreen(start);Position(position);Closed+=(s,e)=>{if(animating)CompositionTarget.Rendering-=Frame;dock.CarryLanded(entry);if(discard&&!dock.RecordingDemo&&!dock.ClosingDock)dock.PulseTrash();};
     }
     public void Follow(Point screen){Point next=PointFromScreen(screen);double now=clock.Elapsed.TotalSeconds,dt=Math.Max(.004,now-last);velocity=new Point(Math.Max(-2500,Math.Min(2500,(next.X-position.X)/dt)),Math.Max(-2500,Math.Min(2500,(next.Y-position.Y)/dt)));last=now;position=next;Position(position);}
     void Position(Point p){cargoMove.X=p.X-24;cargoMove.Y=p.Y-24;buddyMove.X=p.X+20;buddyMove.Y=p.Y-43;tilt.Angle=Math.Max(-13,Math.Min(13,velocity.X/140));}
-    public void Finish(Point screen,bool remove){target=PointFromScreen(screen);discard=remove;last=clock.Elapsed.TotalSeconds;animating=true;CompositionTarget.Rendering+=Frame;}
+    public void Finish(Point screen,bool remove){target=PointFromScreen(screen);discard=remove;last=clock.Elapsed.TotalSeconds;animating=true;demoStart=position;if(!dock.RecordingDemo)CompositionTarget.Rendering+=Frame;}
+    public void AdvanceDemo(){
+        if(!animating)return;demoAge+=1.0/30;
+        double t=Math.Max(0,Math.Min(1,(demoAge-.35)/2.1));double ease=t*t*t*(t*(t*6-15)+10);
+        var previous=position;position=new Point(demoStart.X+(target.X-demoStart.X)*ease,demoStart.Y+(target.Y-demoStart.Y)*ease-62*Math.Sin(Math.PI*t));
+        velocity=new Point((position.X-previous.X)*30,(position.Y-previous.Y)*30);Position(position);
+        double lift=Math.Sin(Math.PI*t);scale.ScaleX=scale.ScaleY=1+.09*lift;tilt.Angle=9*Math.Sin(Math.PI*t);
+        if(demoAge>2.45){double settle=Math.Exp(-(demoAge-2.45)*9)*Math.Sin((demoAge-2.45)*19);scale.ScaleX=1+.08*settle;scale.ScaleY=1-.08*settle;}
+        if(discard){double shrink=Math.Max(.01,1-Math.Max(0,(t-.72)/.28));scale.ScaleX=scale.ScaleY=shrink;cargo.Opacity=shrink;buddyMove.Y-=18*Math.Sin(Math.PI*t);}
+        if(demoAge>3.05){animating=false;Close();}
+    }
     void Frame(object sender,EventArgs e){
         double now=clock.Elapsed.TotalSeconds,dt=Math.Min(.028,Math.Max(.001,now-last));last=now;
         for(int i=0;i<4;i++){double d=dt/4;velocity.X+=(560*(target.X-position.X)-43*velocity.X)*d;velocity.Y+=(560*(target.Y-position.Y)-43*velocity.Y)*d;position.X+=velocity.X*d;position.Y+=velocity.Y*d;}
@@ -49,7 +60,17 @@ public sealed class CarryOverlay:Window {
     }
     public static void Animate(Dock dock,Entry entry,Point from,Point to,bool discard){var overlay=new CarryOverlay(dock,entry,from);overlay.Finish(to,discard);}
 }
+public sealed class FileParcel:FrameworkElement {
+    public FileParcel(){Width=48;Height=48;}
+    protected override void OnRender(DrawingContext d){d.PushTransform(new ScaleTransform(ActualWidth/48,ActualHeight/48));d.DrawRoundedRectangle(Dock.B("#EAF2F4"),null,new Rect(8,3,32,41),5,5);d.DrawGeometry(Dock.B("#99B6C7"),null,Geometry.Parse("M 29,3 L 40,14 L 29,14 Z"));for(int i=0;i<6;i++)d.DrawRectangle(Dock.B("#668396"),null,new Rect(i%2==0?21:25,11+i*4,4,4));d.DrawRoundedRectangle(null,new Pen(Dock.B("#668396"),2),new Rect(21,34,8,6),2,2);d.Pop();}
+}
 public partial class Dock {
+    public void AnimateCleanup(string path,Point from){if(Settings.ReducedMotion)return;CarryOverlay.Animate(this,new Entry{Name=System.IO.Path.GetFileName(path),Target="fluid://parcel",Group="文件"},from,TrashScreenPoint(),true);}
+    readonly System.Collections.Generic.HashSet<string> carryingNames=new System.Collections.Generic.HashSet<string>();
+    public void CarryLanded(Entry entry){
+        carryingNames.Remove(entry.Name);var tile=tiles.FirstOrDefault(t=>t.App.Name==entry.Name);if(tile==null)return;
+        tile.Reveal=1;tile.Button.Opacity=1;if(!Settings.ReducedMotion){tile.ScaleV+=1.1;tile.Bounce-=2;}Wake();
+    }
     bool draggingEntry;
     void BeginDockDrag(Entry entry,Button button,Tile tile){
         if(draggingEntry||Utility(entry)||entry.Target.StartsWith("fluid://"))return;

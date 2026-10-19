@@ -23,5 +23,6 @@ public sealed class BusyIndicator:FrameworkElement {
     }
     void Stop(){if(active.Remove(this)&&active.Count==0)CompositionTarget.Rendering-=Frame;}
     static void Frame(object sender,EventArgs e){double value=clock.Elapsed.TotalSeconds*240%360;foreach(var item in active.ToArray()){item.angle=value;item.InvalidateVisual();}}
+    public static void DemoFrame(double seconds){foreach(var item in active.ToArray()){item.angle=seconds*240%360;item.InvalidateVisual();}}
     protected override void OnRender(DrawingContext d){d.DrawEllipse(null,track,new Point(10,10),7,7);d.PushTransform(new RotateTransform(angle,10,10));d.DrawGeometry(null,ink,arc);d.Pop();}
 }

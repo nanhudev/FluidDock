@@ -6,7 +6,7 @@
 
 ### 从一个空 Dock，整理出自己的 Windows 桌面。
 
-原生圆角玻璃 · 拖放整理 · 本地助手 · 授权清理
+原生圆角玻璃 · 弹性拖放 · 流式扫描 · 本地助手 · 授权清理
 
 [下载预览版](https://github.com/nanhudev/dockbot/releases) · [观看宣传片](https://github.com/nanhudev/dockbot/releases/download/v0.1.1-preview.1/DockBot-Promo.mp4) · [原生流程演示](https://github.com/nanhudev/dockbot/releases/download/v0.1.1-preview.1/DockBot-Demo.mp4)
 

@@ -31,19 +31,19 @@ public static class AppCatalog {
         return "其他工具";
     }
     static bool Eligible(Entry e){return !String.IsNullOrWhiteSpace(e.Target)&&!new[]{"卸载","uninstall","unins000","help","帮助","readme"}.Any(s=>e.Name.ToLowerInvariant().Contains(s));}
-    public static List<Entry> Discover(){
-        var list=new List<Entry>();
+    public static List<Entry> Discover(Action<Entry> onFound=null){
+        var list=new List<Entry>();Action<Entry> accept=e=>{list.Add(e);if(onFound!=null)onFound(e);};
         foreach(string root in new[]{Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu)}){
             if(!Directory.Exists(root))continue;
-            try{foreach(string file in Directory.EnumerateFiles(root,"*.lnk",SearchOption.AllDirectories))try{var e=FromFile(file);if(Eligible(e))list.Add(e);}catch{}}catch{}
+            try{foreach(string file in Directory.EnumerateFiles(root,"*.lnk",SearchOption.AllDirectories))try{var e=FromFile(file);if(Eligible(e))accept(e);}catch{}}catch{}
         }
         foreach(string root in new[]{Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)}){
             if(!Directory.Exists(root))continue;
-            try{foreach(string file in Directory.EnumerateFiles(root,"*.lnk"))try{var e=FromFile(file);if(Eligible(e))list.Add(e);}catch{}}catch{}
+            try{foreach(string file in Directory.EnumerateFiles(root,"*.lnk"))try{var e=FromFile(file);if(Eligible(e))accept(e);}catch{}}catch{}
         }
         foreach(var hive in new[]{Registry.CurrentUser,Registry.LocalMachine})try{
             using(var paths=hive.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"))if(paths!=null)foreach(string name in paths.GetSubKeyNames())try{
-                using(var key=paths.OpenSubKey(name)){string path=Environment.ExpandEnvironmentVariables(Convert.ToString(key.GetValue(""))).Trim('"');if(File.Exists(path)){var e=FromFile(path);if(Eligible(e))list.Add(e);}}
+                using(var key=paths.OpenSubKey(name)){string path=Environment.ExpandEnvironmentVariables(Convert.ToString(key.GetValue(""))).Trim('"');if(File.Exists(path)){var e=FromFile(path);if(Eligible(e))accept(e);}}
             }catch{}
         }catch{}
         foreach(var hive in new[]{Registry.CurrentUser,Registry.LocalMachine})foreach(string uninstall in new[]{@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",@"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"})try{
@@ -52,12 +52,12 @@ public static class AppCatalog {
                 if(name=="")continue;string path=icon.StartsWith("\"")&&icon.IndexOf('"',1)>0?icon.Substring(1,icon.IndexOf('"',1)-1):icon.Split(',')[0].Trim('"');
                 if(Directory.Exists(location)){string launcher=Path.Combine(location,"WeGameLauncher","launcher.exe");if(File.Exists(launcher))path=launcher;}
                 if(!File.Exists(path)||!path.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)||Path.GetFileName(path).ToLowerInvariant().Contains("unins"))continue;
-                var e=FromFile(path);e.Name=name;e.CanonicalId=SoftwareResolver.Canonical(new Entry{Name=name,Target=path});e.Group=GuessGroup(name+" "+e.CanonicalId);if(Eligible(e))list.Add(e);
+                var e=FromFile(path);e.Name=name;e.CanonicalId=SoftwareResolver.Canonical(new Entry{Name=name,Target=path});e.Group=GuessGroup(name+" "+e.CanonicalId);if(Eligible(e))accept(e);
             }}catch{}
         }catch{}
         try{
             dynamic shell=Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application"));dynamic folder=shell.NameSpace("shell:AppsFolder");dynamic items=folder.Items();
-            foreach(dynamic item in items)try{string id=(string)item.Path;string name=(string)item.Name;if(id.Contains("!")&&!String.IsNullOrWhiteSpace(name))list.Add(new Entry{Name=name,Target=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"explorer.exe"),Arguments="shell:AppsFolder\\"+id,WorkDir=Environment.GetFolderPath(Environment.SpecialFolder.Windows),Group=GuessGroup(name),Icon=""});}catch{}
+            foreach(dynamic item in items)try{string id=(string)item.Path;string name=(string)item.Name;if(id.Contains("!")&&!String.IsNullOrWhiteSpace(name))accept(new Entry{Name=name,Target=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"explorer.exe"),Arguments="shell:AppsFolder\\"+id,WorkDir=Environment.GetFolderPath(Environment.SpecialFolder.Windows),Group=GuessGroup(name),Icon=""});}catch{}
             Marshal.FinalReleaseComObject(items);Marshal.FinalReleaseComObject(folder);Marshal.FinalReleaseComObject(shell);
         }catch{}
         return list.GroupBy(Key,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).OrderBy(e=>e.Name).ToList();

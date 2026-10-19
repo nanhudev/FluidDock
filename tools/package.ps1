@@ -9,6 +9,7 @@ New-Item -ItemType Directory -Path $stage -Force|Out-Null
 foreach($name in @('README.md','LICENSE','Install.ps1')){Copy-Item -LiteralPath (Join-Path $root $name) -Destination $stage}
 Copy-Item -LiteralPath (Join-Path $root 'bin\DockBot.exe') -Destination $stage -Force
 Copy-Item -LiteralPath (Join-Path $root 'docs') -Destination (Join-Path $stage 'docs') -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $root 'assets') -Destination (Join-Path $stage 'assets') -Recurse -Force
 $zip=$stage+'.zip'
 Compress-Archive -LiteralPath $stage -DestinationPath $zip -Force:$Refresh
 Get-FileHash -LiteralPath $zip -Algorithm SHA256|ForEach-Object {$_.Hash.ToLowerInvariant()+'  '+[IO.Path]::GetFileName($zip)}|Set-Content -LiteralPath ($zip+'.sha256') -Encoding ascii

@@ -13,6 +13,7 @@ public static partial class Native {
  [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr h,int id);
  [DllImport("user32.dll")] public static extern bool GetLastInputInfo(ref INPUT data);
  [DllImport("shell32.dll",CharSet=CharSet.Unicode)] public static extern uint ExtractIconEx(string p,int n,IntPtr[] big,IntPtr[] small,uint count);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern uint PrivateExtractIcons(string path,int index,int width,int height,IntPtr[] icons,uint[] ids,uint count,uint flags);
  [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr h);
  [DllImport("user32.dll")] public static extern int SetWindowCompositionAttribute(IntPtr h,ref COMPOSITION data);
  [DllImport("dwmapi.dll")] public static extern int DwmExtendFrameIntoClientArea(IntPtr h,ref MARGINS m);
@@ -35,12 +36,13 @@ public class GlassWindow:Window {
  public GlassWindow(){WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;Background=Brushes.Transparent;ShowInTaskbar=false;Topmost=true;ShowActivated=false;SourceInitialized+=(s,e)=>GlassEnabled=Native.Glass(this);SizeChanged+=(s,e)=>Native.Round(this);}
 }
 public partial class Dock:Window {
+ public bool ClosingDock{get{return closing;}}
  public static string Home=ProductData.Location();public static JavaScriptSerializer Json=new JavaScriptSerializer();
  public List<Entry> Entries;public Dictionary<string,Use> Usage=new Dictionary<string,Use>();public Prefs Settings;
  Dictionary<string,ImageSource> icons=new Dictionary<string,ImageSource>();object iconLock=new object();Canvas canvas;Border rim,caption,dropBadge;TextBlock captionText;GlassWindow glass;SearchPanel search;ClockWidget widget;Forms.NotifyIcon tray;
  DispatcherTimer monitor=new DispatcherTimer();Stopwatch time=Stopwatch.StartNew();double last,hide,hideV,hideTarget,baseWidth;bool rendering,dirty,closing;int ticks,dragIndex=-1;uint lastPid;Entry activeEntry;DateTime lastUsage=DateTime.UtcNow;bool resolving;
  public bool HotkeyRegistered;public double LastSearchMs;List<Tile> tiles=new List<Tile>();List<Border> dividers=new List<Border>();long surfaceWrites;bool measureHover;List<double> hoverFrameCosts=new List<double>(256),hoverFrameGaps=new List<double>(256);Stopwatch renderCostWatch=new Stopwatch();
- class Tile {public Entry App;public Button Button;public ScaleTransform Scale;public TranslateTransform Move;public double ScaleNow=1,ScaleV,Target=1,Center,Baseline,Lift,LiftV,Bounce,OffsetX,OffsetV,InitialX=Double.NaN;public Point Down;public bool Pressed;}
+ class Tile {public Entry App;public Button Button;public ScaleTransform Scale;public TranslateTransform Move;public double Reveal=1,RevealDelay,ScaleNow=1,ScaleV,Target=1,Center,Baseline,Lift,LiftV,Bounce,OffsetX,OffsetV,InitialX=Double.NaN;public Point Down;public bool Pressed;}
  [STAThread]public static void Main(string[] args){if(args.Contains("--record-demo")&&!args.Contains("--data-dir"))return;if(args.Contains("--self-test")){Environment.Exit(ProductTests.Run(Home));return;}bool first;using(var mutex=new Mutex(true,"Local\\FluidDock.Desktop.v1"+ProductData.InstanceSuffix(),out first)){if(!first){try{using(var signal=EventWaitHandle.OpenExisting("Local\\FluidDock.Toggle"+ProductData.InstanceSuffix()))signal.Set();}catch{}return;}try{var app=new Application{ShutdownMode=ShutdownMode.OnMainWindowClose};Theme(app);app.Run(new Dock(args));}catch(Exception ex){File.AppendAllText(Path.Combine(Home,"error.log"),DateTime.Now+" "+ex+"\r\n");Environment.ExitCode=1;}}}
  public Dock(string[] args){
  ProductData.Ensure(Home);Entries=Json.Deserialize<List<Entry>>(File.ReadAllText(Path.Combine(Home,"apps.json")));
@@ -64,13 +66,14 @@ public partial class Dock:Window {
  }
  public static SolidColorBrush B(string s){var b=(SolidColorBrush)new BrushConverter().ConvertFromString(s);b.Freeze();return b;}
  static void Theme(Application app){
+ ControlTheme.Install(app);
  var menu=new Style(typeof(ContextMenu));menu.Setters.Add(new Setter(Control.BackgroundProperty,B("#F4252C39")));menu.Setters.Add(new Setter(Control.ForegroundProperty,B("#E6EDF7")));menu.Setters.Add(new Setter(Control.BorderBrushProperty,B("#45FFFFFF")));menu.Setters.Add(new Setter(Control.PaddingProperty,new Thickness(6)));app.Resources[typeof(ContextMenu)]=menu;
  var item=new Style(typeof(MenuItem));item.Setters.Add(new Setter(Control.PaddingProperty,new Thickness(12,7,12,7)));item.Setters.Add(new Setter(Control.FontSizeProperty,12.0));app.Resources[typeof(MenuItem)]=item;
  }
  public static TextBlock Text(string s,double size,string color){var brush=B(color);return new TextBlock{Text=s,FontSize=size,Tag=brush,Foreground=ThemeState.Light?B("#253247"):brush,FontFamily=new FontFamily("Segoe UI"),VerticalAlignment=VerticalAlignment.Center};}
  public static void ButtonStyle(Button b,bool hoverEffects=true){
  var f=new FrameworkElementFactory(typeof(Border));f.SetValue(Border.CornerRadiusProperty,new CornerRadius(11));f.SetValue(Border.BackgroundProperty,new TemplateBindingExtension(Control.BackgroundProperty));var cp=new FrameworkElementFactory(typeof(ContentPresenter));cp.SetValue(FrameworkElement.MarginProperty,new TemplateBindingExtension(Control.PaddingProperty));cp.SetValue(FrameworkElement.HorizontalAlignmentProperty,HorizontalAlignment.Center);cp.SetValue(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Center);f.AppendChild(cp);b.Template=new ControlTemplate(typeof(Button)){VisualTree=f};b.BorderThickness=new Thickness(0);b.Foreground=ThemeState.Light?B("#253247"):B("#E8EDF6");b.Cursor=Cursors.Hand;b.FocusVisualStyle=null;
- if(!hoverEffects){b.Background=Brushes.Transparent;return;}var hover=new SolidColorBrush(Colors.Transparent);b.Background=hover;b.MouseEnter+=(s,e)=>hover.BeginAnimation(SolidColorBrush.ColorProperty,new ColorAnimation(Color.FromArgb(30,255,255,255),TimeSpan.FromMilliseconds(100)));b.MouseLeave+=(s,e)=>hover.BeginAnimation(SolidColorBrush.ColorProperty,new ColorAnimation(Colors.Transparent,TimeSpan.FromMilliseconds(180)));
+ if(!hoverEffects){b.Background=Brushes.Transparent;return;}FluidMotion.Press(b);var hover=new SolidColorBrush(Color.FromArgb(15,255,255,255));b.Background=hover;b.MouseEnter+=(s,e)=>hover.BeginAnimation(SolidColorBrush.ColorProperty,new ColorAnimation(Color.FromArgb(30,255,255,255),TimeSpan.FromMilliseconds(100)));b.MouseLeave+=(s,e)=>hover.BeginAnimation(SolidColorBrush.ColorProperty,new ColorAnimation(Color.FromArgb(15,255,255,255),TimeSpan.FromMilliseconds(180)));
  }
  void Place(){var a=SystemParameters.WorkArea;Left=a.Left+8;Top=a.Bottom-Height-10;LayoutDock();}
  bool Utility(Entry e){return e.Name=="此电脑"||e.Name=="回收站"||e.Name=="桌面收纳"||e.Name=="文件";}
@@ -81,9 +84,9 @@ public partial class Dock:Window {
  int capacity=Math.Max(8,(int)((Width/Settings.DockScale-140)/36));if(apps.Count>capacity){var special=apps.Where(a=>a.Target.StartsWith("fluid://")).ToList();apps=apps.Where(a=>!a.Target.StartsWith("fluid://")).Take(capacity-special.Count).Concat(special).ToList();}double cell=Math.Max(24,Math.Min(58,(Width/Settings.DockScale-180)/Math.Max(1,apps.Count)));double x=0;string group="";
  foreach(var e in apps){
  if(group!=""&&e.Group!=group){x+=17;var d=new Border{Width=1,Height=29,Background=B("#35FFFFFF"),IsHitTestVisible=false,RenderTransform=new TranslateTransform()};Canvas.SetLeft(d,0);Canvas.SetTop(d,91);canvas.Children.Add(d);dividers.Add(d);}group=e.Group;
- var t=new Tile{App=e,Scale=new ScaleTransform(1,1),Move=new TranslateTransform()};Tile previous;if(oldTiles.TryGetValue(AppCatalog.Key(e),out previous)){t.InitialX=previous.Move.X;t.ScaleNow=previous.ScaleNow;t.ScaleV=previous.ScaleV;t.Target=1;t.OffsetV=previous.OffsetV;}var b=new Button{Width=cell,Height=88};ButtonStyle(b,false);var image=e.Target=="fluid://search"?(FrameworkElement)Text("⌕",30,"#EEF4FE"):e.Target=="fluid://add"?(FrameworkElement)Text("+",30,"#EEF4FE"):AppVisual(e,Math.Min(47,cell-8));if(e.Target=="fluid://assistant"){botSlide=new TranslateTransform(0,botY);image.RenderTransform=botSlide;image=new Border{Width=44,Height=40,ClipToBounds=true,Child=image};}image.IsHitTestVisible=false;image.CacheMode=new BitmapCache{RenderAtScale=1.5,SnapsToDevicePixels=true};RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.Linear);b.Content=image;
+ var t=new Tile{App=e,Scale=new ScaleTransform(1,1),Move=new TranslateTransform()};Tile previous;if(oldTiles.TryGetValue(AppCatalog.Key(e),out previous)){t.InitialX=previous.Move.X;t.Reveal=previous.Reveal;t.RevealDelay=previous.RevealDelay;t.ScaleNow=previous.ScaleNow;t.ScaleV=previous.ScaleV;t.Target=1;t.OffsetV=previous.OffsetV;}else if(!Settings.ReducedMotion&&oldTiles.Count>0&&!Utility(e)&&!e.Target.StartsWith("fluid://")){t.Reveal=0;t.RevealDelay=tiles.Count*.035;t.ScaleNow=.64;t.ScaleV=1;t.Lift=20;t.LiftV=-30;}var b=new Button{Width=cell,Height=88};ButtonStyle(b,false);var image=e.Target=="fluid://search"?(FrameworkElement)Text("⌕",30,"#EEF4FE"):e.Target=="fluid://add"?(FrameworkElement)Text("+",30,"#EEF4FE"):AppVisual(e,Math.Min(47,cell-8));if(e.Target=="fluid://assistant"){botSlide=new TranslateTransform(0,botY);image.RenderTransform=botSlide;image=new Border{Width=44,Height=40,ClipToBounds=true,Child=image};}image.IsHitTestVisible=false;image.CacheMode=new BitmapCache{RenderAtScale=RecordingDemo?4:1.5,SnapsToDevicePixels=true};RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.HighQuality);b.Content=image;
  var tg=new TransformGroup();tg.Children.Add(t.Scale);tg.Children.Add(t.Move);b.RenderTransform=tg;b.RenderTransformOrigin=new Point(.5,.64);b.ContextMenu=e.Target.StartsWith("fluid://")?Menu():EntryMenu(e);System.Windows.Automation.AutomationProperties.SetName(b,e.Name);
- t.Baseline=x+cell/2;t.Button=b;Canvas.SetLeft(b,0);Canvas.SetTop(b,52);
+ t.Baseline=x+cell/2;t.Button=b;b.Opacity=carryingNames.Contains(e.Name)?0:t.Reveal;Canvas.SetLeft(b,0);Canvas.SetTop(b,52);
  b.PreviewMouseLeftButtonDown+=(s,a)=>{t.Down=a.GetPosition(canvas);t.Pressed=true;t.Target=.90;Wake();};b.PreviewMouseLeftButtonUp+=(s,a)=>{t.Pressed=false;t.Target=1.35;Wake();};
  b.MouseMove+=(s,a)=>{if(t.Pressed&&a.LeftButton==MouseButtonState.Pressed&&(a.GetPosition(canvas)-t.Down).Length>7){t.Pressed=false;BeginDockDrag(e,b,t);a.Handled=true;}};
  b.Click+=(s,a)=>{t.Bounce=-9;Wake();Launch(e);};b.GotKeyboardFocus+=(s,a)=>{t.Target=1.25;Wake();};b.LostKeyboardFocus+=(s,a)=>{t.Target=1;Wake();};
@@ -103,10 +106,10 @@ baseWidth=x;if(plateWidth<=0)plateWidth=baseWidth;LayoutDock();if(search!=null)s
  foreach(var t in tiles){double d=Math.Abs(p.X-(origin+t.Baseline));if(!t.Pressed)t.Target=t.App.Target=="fluid://assistant"?1:p.Y<40?1:1+.40*Math.Exp(-d*d/(2*52*52));if(d<nd){nd=d;nearest=t;}}
  if(nearest!=null&&nd<44&&p.Y>35){string label=nearest.App.Name+"  ·  "+nearest.App.Group;if(captionText.Text!=label){captionText.Text=label;caption.Measure(new Size(500,100));}Canvas.SetLeft(caption,nearest.Center-caption.DesiredSize.Width/2);Canvas.SetTop(caption,14);caption.Opacity=1;}else caption.Opacity=0;Wake();
  }
- void Wake(){if(!rendering){rendering=true;last=time.Elapsed.TotalSeconds;CompositionTarget.Rendering+=Render;}}
+ void Wake(){if(!rendering){rendering=true;last=time.Elapsed.TotalSeconds;if(!RecordingDemo)CompositionTarget.Rendering+=Render;}}
  void Render(object sender,EventArgs e){
- double now=time.Elapsed.TotalSeconds,rawGap=now-last,dt=Math.Min(.035,Math.Max(.001,rawGap));last=now;bool moving=false;if(measureHover){renderCostWatch.Restart();if(rawGap>.001)hoverFrameGaps.Add(rawGap*1000);}
- foreach(var t in tiles){double liftTarget=-Math.Max(0,t.Target-1)*32;
+ double now=time.Elapsed.TotalSeconds,rawGap=now-last,dt=Math.Min(.035,Math.Max(.001,rawGap));last=now;if(RecordingDemo)dt=1.0/30;bool moving=false;if(measureHover){renderCostWatch.Restart();if(rawGap>.001)hoverFrameGaps.Add(rawGap*1000);}
+ foreach(var t in tiles){if(t.RevealDelay>0){t.RevealDelay-=dt;moving=true;continue;}if(t.Reveal<.999){t.Reveal+=(1-t.Reveal)*(1-Math.Exp(-dt*19));t.Button.Opacity=carryingNames.Contains(t.App.Name)?0:t.Reveal;moving=true;}double liftTarget=-Math.Max(0,t.Target-1)*32;
  if(Settings.ReducedMotion){t.ScaleNow=t.Target>1?1.08:t.Target;t.Lift=0;t.ScaleV=0;t.Bounce=0;}
  else for(int i=0;i<4;i++){double d=dt/4;t.ScaleV+=(680*(t.Target-t.ScaleNow)-43*t.ScaleV)*d;t.ScaleNow+=t.ScaleV*d;t.LiftV+=(600*(liftTarget-t.Lift)-43*t.LiftV)*d;t.Lift+=t.LiftV*d;}
  for(int i=0;i<4;i++){t.OffsetV+=(-600*t.OffsetX-43*t.OffsetV)*dt/4;t.OffsetX+=t.OffsetV*dt/4;}if(Math.Abs(t.OffsetX)>.08||Math.Abs(t.OffsetV)>.1)moving=true;t.Bounce*=Math.Exp(-dt*15);if(!Settings.ReducedMotion&&(Math.Abs(t.Target-t.ScaleNow)>.001||Math.Abs(t.ScaleV)>.005||Math.Abs(liftTarget-t.Lift)>.04||Math.Abs(t.Bounce)>.05))moving=true;}
@@ -117,6 +120,7 @@ baseWidth=x;if(plateWidth<=0)plateWidth=baseWidth;LayoutDock();if(search!=null)s
  public void ToggleSearch(){if(search==null){search=new SearchPanel(this);search.Prepare();}if(search.IsVisible)search.Dismiss();else search.Reveal();}
  public void OpenCategory(string category){if(search==null){search=new SearchPanel(this);search.Prepare();}search.SetMode("library");search.Category=category;search.Reveal();}
  public FrameworkElement AppVisual(Entry e,double size){
+ if(e.Target=="demo://parcel"||e.Target=="fluid://parcel")return new FileParcel{Width=size,Height=size};
  if(e.Target=="fluid://assistant")return new BuddyFace{Width=size,Height=size};
  var grid=new Grid{Width=size,Height=size};var image=new Image{Width=size,Height=size,Stretch=Stretch.Uniform,SnapsToDevicePixels=true};
  var fallback=new Border{CornerRadius=new CornerRadius(12),Background=B("#4E586579"),BorderBrush=B("#35FFFFFF"),BorderThickness=new Thickness(1)};
@@ -130,7 +134,7 @@ baseWidth=x;if(plateWidth<=0)plateWidth=baseWidth;LayoutDock();if(search!=null)s
  try{string custom=e.Icon??"";int index=0;int comma=custom.LastIndexOf(',');if(comma>0){int.TryParse(custom.Substring(comma+1),out index);custom=custom.Substring(0,comma);}
  string cached=Path.Combine(Home,"icons",Safe(e.Name)+".png");string p=File.Exists(custom)?custom:File.Exists(cached)?cached:e.Target;
  if(File.Exists(p)&&(p.EndsWith(".png",StringComparison.OrdinalIgnoreCase)||p.EndsWith(".ico",StringComparison.OrdinalIgnoreCase)||p.EndsWith(".jpg",StringComparison.OrdinalIgnoreCase))){var dec=BitmapDecoder.Create(new Uri(p),BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);var f=dec.Frames.OrderByDescending(a=>a.PixelWidth).First();f.Freeze();result=f;}
- else if(File.Exists(p)){IntPtr[] handles=new IntPtr[1];Native.ExtractIconEx(p,index,handles,null,1);if(handles[0]!=IntPtr.Zero)try{var f=Imaging.CreateBitmapSourceFromHIcon(handles[0],Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions());f.Freeze();result=f;}finally{Native.DestroyIcon(handles[0]);}}
+ else if(File.Exists(p)){IntPtr[] handles=new IntPtr[1];Native.PrivateExtractIcons(p,index,256,256,handles,new uint[1],1,0);if(handles[0]==IntPtr.Zero)Native.ExtractIconEx(p,index,handles,null,1);if(handles[0]!=IntPtr.Zero)try{var f=Imaging.CreateBitmapSourceFromHIcon(handles[0],Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions());f.Freeze();result=f;}finally{Native.DestroyIcon(handles[0]);}}
  }catch{}if(result!=null)lock(iconLock)icons[e.Name]=result;return result;
  }
  static string Safe(string s){foreach(char c in Path.GetInvalidFileNameChars())s=s.Replace(c,'_');return s;}
@@ -229,8 +233,7 @@ public partial class SearchPanel:GlassWindow {
  var f=new FrameworkElementFactory(typeof(Border));f.SetValue(Border.CornerRadiusProperty,new CornerRadius(13));f.SetValue(Border.BackgroundProperty,new TemplateBindingExtension(Control.BackgroundProperty));var cp=new FrameworkElementFactory(typeof(ContentPresenter));f.AppendChild(cp);var tpl=new ControlTemplate(typeof(ListBoxItem)){VisualTree=f};
  var selected=new Trigger{Property=ListBoxItem.IsSelectedProperty,Value=true};selected.Setters.Add(new Setter(Control.BackgroundProperty,Dock.B("#294FA9D5")));tpl.Triggers.Add(selected);var over=new Trigger{Property=UIElement.IsMouseOverProperty,Value=true};over.Setters.Add(new Setter(Control.BackgroundProperty,Dock.B("#18FFFFFF")));tpl.Triggers.Add(over);style.Setters.Add(new Setter(Control.TemplateProperty,tpl));results.ItemContainerStyle=style;
  ScrollViewer.SetHorizontalScrollBarVisibility(results,ScrollBarVisibility.Disabled);ScrollViewer.SetVerticalScrollBarVisibility(results,ScrollBarVisibility.Auto);
- string scrollTheme="<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='{x:Type ScrollBar}'><Setter Property='Width' Value='5'/><Setter Property='Background' Value='Transparent'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='{x:Type ScrollBar}'><Track x:Name='PART_Track' Orientation='Vertical' IsDirectionReversed='True' Minimum='{TemplateBinding Minimum}' Maximum='{TemplateBinding Maximum}' Value='{TemplateBinding Value}' ViewportSize='{TemplateBinding ViewportSize}'><Track.DecreaseRepeatButton><RepeatButton Command='{x:Static ScrollBar.PageUpCommand}'><RepeatButton.Template><ControlTemplate><Border Background='Transparent'/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton><Track.Thumb><Thumb MinHeight='24'><Thumb.Template><ControlTemplate TargetType='{x:Type Thumb}'><Border x:Name='Grip' Background='#526E8299' CornerRadius='2' Width='4' HorizontalAlignment='Center'/><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Grip' Property='Background' Value='#91ADC3DD'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Thumb.Template></Thumb></Track.Thumb><Track.IncreaseRepeatButton><RepeatButton Command='{x:Static ScrollBar.PageDownCommand}'><RepeatButton.Template><ControlTemplate><Border Background='Transparent'/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton></Track></ControlTemplate></Setter.Value></Setter></Style>";
- results.Resources[typeof(System.Windows.Controls.Primitives.ScrollBar)]=(Style)System.Windows.Markup.XamlReader.Parse(scrollTheme);
+
  var body=new Grid();body.Children.Add(results);empty=Dock.Text("没有找到应用 · 可拖入程序添加",14,"#A6B6CA");empty.HorizontalAlignment=HorizontalAlignment.Center;empty.Visibility=Visibility.Collapsed;body.Children.Add(empty);root.Children.Add(body);InitializeAssistant(body,bottom);
  results.PreviewMouseLeftButtonUp+=(s,e)=>{var node=e.OriginalSource as DependencyObject;while(node!=null&&!(node is ListBoxItem))node=VisualTreeHelper.GetParent(node);if(node!=null){var entry=((ListBoxItem)node).Tag as Entry;if(entry!=null)ActivateItem(entry);}};
  PreviewKeyDown+=(s,e)=>{if(e.Key==Key.Escape){Dismiss();e.Handled=true;}else if(e.Key==Key.Enter&&Mode=="assistant"){RunAssistant();e.Handled=true;}else if(e.Key==Key.Enter&&results.SelectedIndex>=0&&results.SelectedIndex<current.Count){ActivateItem(current[results.SelectedIndex]);e.Handled=true;}else if(e.Key==Key.Down||e.Key==Key.Up){results.SelectedIndex=Math.Max(0,Math.Min(current.Count-1,results.SelectedIndex+(e.Key==Key.Down?1:-1)));if(results.SelectedItem!=null)results.ScrollIntoView(results.SelectedItem);e.Handled=true;}};
@@ -246,7 +249,7 @@ public partial class SearchPanel:GlassWindow {
  dock.LastSearchMs=sw.Elapsed.TotalMilliseconds;
  }
  public bool CheckSearch(){Category="全部";input.Text="wx";bool wx=current.Any(x=>x.Name=="微信");input.Text="sjz";bool delta=current.Any(x=>x.Name=="三角洲");input.Text="__fluid_no_result__";bool none=current.Count==0;input.Text="";return wx&&delta&&none;}
- public void Dismiss(){showing=false;AnimatePanel(false);Hide();}
+ public void Dismiss(){showing=false;AnimatePanel(false);if(dock.Settings.ReducedMotion||dock.RecordingDemo)Hide();}
  void AnimatePanel(bool open){
   morphTarget=open?1:0;surface.RenderTransformOrigin=new Point(.5,.2);
   var tg=new TransformGroup();tg.Children.Add(morphScale);tg.Children.Add(morphMove);surface.RenderTransform=tg;
@@ -256,8 +259,8 @@ public partial class SearchPanel:GlassWindow {
  void MorphFrame(object s,EventArgs e){
   double now=morphClock.Elapsed.TotalSeconds,dt=Math.Min(.032,Math.Max(.001,now-morphLast));morphLast=now;
   for(int i=0;i<4;i++){morphV+=(720*(morphTarget-morph)-48*morphV)*dt/4;morph+=morphV*dt/4;}
-  morphScale.ScaleX=morphScale.ScaleY=.985+.015*morph;morphMove.Y=5*(1-morph);surface.Opacity=Math.Max(0,Math.Min(1,.35+.65*morph));
-  if(Math.Abs(morphTarget-morph)<.001&&Math.Abs(morphV)<.006){CompositionTarget.Rendering-=MorphFrame;morphTick=false;}
+  morphScale.ScaleX=morphScale.ScaleY=.965+.035*morph;morphMove.Y=12*(1-morph);surface.Opacity=Math.Max(0,Math.Min(1,.35+.65*morph));
+  if(Math.Abs(morphTarget-morph)<.001&&Math.Abs(morphV)<.006){CompositionTarget.Rendering-=MorphFrame;morphTick=false;if(!showing)Hide();}
  }
  void Refresh(){
  stale=false;if(results==null)return;if(Mode=="assistant"){UpdateAssistant();return;}RequestFiles(input.Text.Trim());if(assistantRoot!=null)assistantRoot.Visibility=Visibility.Collapsed;results.Visibility=Visibility.Visible;results.Items.Clear();string q=input.Text.Trim().ToLowerInvariant();bool stats=Category=="统计",hidden=Category=="隐藏";

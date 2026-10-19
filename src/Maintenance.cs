@@ -29,8 +29,8 @@ public static class CareScan {
         if(new[]{windows,programs,programs32,appdata,local,Environment.GetEnvironmentVariable("ProgramData")}.Where(r=>!String.IsNullOrEmpty(r)).Any(r=>Within(path,r)||String.Equals(Path.GetFullPath(path).TrimEnd('\\'),r.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase)))return true;
         return new[]{".exe",".dll",".sys",".msi",".lnk",".url",".vhd",".vhdx"}.Contains(Path.GetExtension(path).ToLowerInvariant());
     }
-    public static CareReport Scan(string mode,string root,Func<bool> canceled){
-        var report=new CareReport();var watch=Stopwatch.StartNew();var queue=new Queue<string>();queue.Enqueue(Path.GetFullPath(root));int visited=0;
+    public static CareReport Scan(string mode,string root,Func<bool> canceled,Action<CareItem> onFound=null){
+        var report=new CareReport();Action<CareItem> accept=item=>{report.Items.Add(item);if(onFound!=null)onFound(item);};var watch=Stopwatch.StartNew();var queue=new Queue<string>();queue.Enqueue(Path.GetFullPath(root));int visited=0;
         string archive=Path.Combine(root,"Dock 整理",DateTime.Now.ToString("yyyyMMdd-HHmmss"));
         while(queue.Count>0&&!canceled()){
             if(visited++>4000||watch.Elapsed.TotalSeconds>20||report.Items.Count>=500){report.Limited=true;break;}string dir=queue.Dequeue();
@@ -40,9 +40,9 @@ public static class CareScan {
                     try{var f=new FileInfo(path);if(!NoLinks(path)){report.Skipped++;continue;}
                         if(mode=="desktop"){
                             if(f.Name.Equals("desktop.ini",StringComparison.OrdinalIgnoreCase)||new[]{".exe",".dll",".sys"}.Contains(f.Extension.ToLowerInvariant()))continue;
-                            report.Items.Add(new CareItem{Path=path,Bytes=f.Length,Modified=f.LastWriteTimeUtc,Kind=mode,Destination=Path.Combine(archive,DesktopCategory(path),f.Name),Reason="移动到桌面归档"});
+                            accept(new CareItem{Path=path,Bytes=f.Length,Modified=f.LastWriteTimeUtc,Kind=mode,Destination=Path.Combine(archive,DesktopCategory(path),f.Name),Reason="移动到桌面归档"});
                         }else if(mode=="temp"?TempEligible(path,DateTime.UtcNow):f.Length>=250L*1048576&&!Protected(path)){
-                            report.Items.Add(new CareItem{Path=path,Bytes=f.Length,Modified=f.LastWriteTimeUtc,Kind=mode,Reason=mode=="temp"?"超过 7 天未修改、未访问的临时文件；移入回收站":"大文件，内容未判断；仅在确认不需要后移入回收站"});
+                            accept(new CareItem{Path=path,Bytes=f.Length,Modified=f.LastWriteTimeUtc,Kind=mode,Reason=mode=="temp"?"超过 7 天未修改、未访问的临时文件；移入回收站":"大文件，内容未判断；仅在确认不需要后移入回收站"});
                         }
                     }catch{report.Skipped++;}
                 }
@@ -75,7 +75,7 @@ public sealed partial class CareWindow:GlassWindow {
         AddButton(actions,"Windows 存储清理",()=>{if(MessageBox.Show(this,"打开 Windows 存储设置。系统缓存、更新文件等由你在系统中勾选确认。","系统存储",MessageBoxButton.OKCancel)==MessageBoxResult.OK)Process.Start(new ProcessStartInfo("ms-settings:storagesense"){UseShellExecute=true});});
         status=Dock.Text("选择扫描范围。扫描不会修改文件。",12,"#AFC1D6");status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(0,0,0,12);var progress=new DockPanel();progress.Children.Add(spinner);progress.Children.Add(status);Grid.SetRow(progress,1);grid.Children.Add(progress);
         var scroll=new ScrollViewer{Content=rows,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};Grid.SetRow(scroll,2);grid.Children.Add(scroll);
-        execute=new Button{Content="处理勾选项",Padding=new Thickness(20,12,20,12),HorizontalAlignment=HorizontalAlignment.Right,IsEnabled=false,Margin=new Thickness(0,14,0,0)};Dock.ButtonStyle(execute);execute.Click+=(s,e)=>Confirm();Grid.SetRow(execute,3);grid.Children.Add(execute);PanelChrome.Attach(this,grid,owner);
+        execute=new Button{Content="处理勾选项",Padding=new Thickness(20,12,20,12),HorizontalAlignment=HorizontalAlignment.Right,IsEnabled=false,Margin=new Thickness(0,14,0,0)};Dock.ButtonStyle(execute,false);ControlTheme.Primary(execute);execute.Click+=(s,e)=>Confirm();Grid.SetRow(execute,3);grid.Children.Add(execute);PanelChrome.Attach(this,grid,owner);
     }
     void AddButton(Panel p,string text,Action action){var b=new Button{Content=text,Padding=new Thickness(12,9,12,9),Margin=new Thickness(0,0,8,8)};Dock.ButtonStyle(b);b.Click+=(s,e)=>{if(!busy)action();};p.Children.Add(b);}
     void ShowApps(){rows.Children.Clear();selections.Clear();UpdateCount();status.Text="可通过 Windows 卸载的应用，按登记大小排序。请自行判断是否仍需要；未记录使用不代表没用。";foreach(var app in InstalledApps.List()){
@@ -86,20 +86,21 @@ public sealed partial class CareWindow:GlassWindow {
     void Scan(string kind,string folder){
         try{var drive=new DriveInfo(Path.GetPathRoot(folder));if(drive.DriveType!=DriveType.Fixed){status.Text="请选择本地固定磁盘。";return;}if(kind=="large"&&CareScan.Protected(folder)){status.Text="请选择个人文件夹，系统和应用目录不参与清理。";return;}}catch{status.Text="无法访问此位置。";return;}
         mode=kind;root=folder;busy=true;spinner.IsRunning=true;execute.IsEnabled=false;rows.Children.Clear();selections.Clear();status.Text="正在扫描："+folder;
-        ThreadPool.QueueUserWorkItem(s=>{CareReport report;try{report=CareScan.Scan(kind,folder,()=>stopped);}catch(Exception ex){if(!stopped)Dispatcher.BeginInvoke(new Action(()=>{busy=false;spinner.IsRunning=false;status.Text=ex.Message;}));return;}if(stopped)return;Dispatcher.BeginInvoke(new Action(()=>{
+        ThreadPool.QueueUserWorkItem(s=>{CareReport report;try{report=CareScan.Scan(kind,folder,()=>stopped,item=>Dispatcher.BeginInvoke(new Action(()=>{if(stopped)return;AddScannedItem(item);status.Text="正在扫描… · "+selections.Count+" 项 · "+CareScan.Size(selections.Sum(p=>p.Item2.Bytes));})));}catch(Exception ex){if(!stopped)Dispatcher.BeginInvoke(new Action(()=>{busy=false;spinner.IsRunning=false;status.Text=ex.Message;}));return;}if(stopped)return;Dispatcher.BeginInvoke(new Action(()=>{
             busy=false;spinner.IsRunning=false;status.Text=(kind=="desktop"?"只移动所选文件，文件夹与程序保留。":kind=="temp"?"仅用户临时目录，超过 7 天的临时文件。": "≥250 MB，大小不代表可删除。请核对内容。")+"\n"+report.Items.Count+" 项 · "+CareScan.Size(report.Items.Sum(i=>i.Bytes))+" · 跳过 "+report.Skipped+" 个无法访问或受保护位置"+(report.Limited?" · 已达扫描上限，可选择更小的文件夹":"")+"\n移入回收站后不会立即释放空间；清空回收站需自行操作。";
-            foreach(var item in report.Items){var cb=new CheckBox{Content=new TextBlock{Text=item.Label,TextWrapping=TextWrapping.Wrap,Foreground=Foreground,FontSize=12},Margin=new Thickness(4,10,4,10),IsChecked=false};cb.Checked+=(a,b)=>UpdateCount();cb.Unchecked+=(a,b)=>UpdateCount();selections.Add(Tuple.Create(cb,item));rows.Children.Add(cb);}UpdateCount();
+            UpdateCount();
         }));});
     }
+    void AddScannedItem(CareItem item){var cb=new CheckBox{Content=new TextBlock{Text=item.Label,TextWrapping=TextWrapping.Wrap,Foreground=Foreground,FontSize=12},Margin=new Thickness(4,10,4,10),IsChecked=false};cb.Checked+=(a,b)=>UpdateCount();cb.Unchecked+=(a,b)=>UpdateCount();selections.Add(Tuple.Create(cb,item));rows.Children.Add(cb);dock.RevealItem(cb);}
     void UpdateCount(){int n=selections.Count(p=>p.Item1.IsChecked==true);execute.Content="处理勾选项（"+n+"）";execute.IsEnabled=!busy&&n>0;}
     void Confirm(){
         var chosen=selections.Where(p=>p.Item1.IsChecked==true).Select(p=>p.Item2).ToArray();if(chosen.Length==0||busy)return;
         string summary=(mode=="desktop"?"移动到桌面归档":"移入回收站")+"："+chosen.Length+" 项，"+CareScan.Size(chosen.Sum(i=>i.Bytes))+"。\n\n"+String.Join("\n",chosen.Take(8).Select(i=>i.Path))+(chosen.Length>8?"\n其余 "+(chosen.Length-8)+" 项见勾选清单。":"");
-        if(MessageBox.Show(this,summary,"确认处理所选文件",MessageBoxButton.OKCancel,MessageBoxImage.Question)!=MessageBoxResult.OK)return;
+        if(!ConfirmSheet.Ask(this,dock,summary))return;
         busy=true;execute.IsEnabled=false;foreach(var p in selections)p.Item1.IsEnabled=false;
         var stamp=DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff");string audit=Path.Combine(Dock.Home,"care-history",stamp+".json");
         try{Directory.CreateDirectory(Path.GetDirectoryName(audit));File.WriteAllText(audit,Dock.Json.Serialize(new{state="authorized",time=DateTime.UtcNow,items=chosen}));}catch(Exception ex){busy=false;status.Text="无法保存处理清单："+ex.Message;foreach(var p in selections)p.Item1.IsEnabled=true;UpdateCount();return;}
-        var worker=new Thread(()=>{var outcomes=new List<object>();int done=0;foreach(var item in chosen){if(stopped)break;string result;try{result=CareScan.Apply(item,root);}catch(Exception ex){result=ex.Message;}if(result=="已移动"||result=="已移入回收站")done++;outcomes.Add(new{item=item,result=result});try{File.WriteAllText(audit,Dock.Json.Serialize(new{state="processed",time=DateTime.UtcNow,authorized=chosen,items=outcomes}));}catch{break;}}if(!stopped)Dispatcher.BeginInvoke(new Action(()=>{busy=false;status.Text="已处理 "+done+" / "+chosen.Length+" 项。记录："+audit;rows.Children.Clear();selections.Clear();UpdateCount();}));});worker.IsBackground=true;worker.SetApartmentState(ApartmentState.STA);worker.Start();
+        var worker=new Thread(()=>{var outcomes=new List<object>();var completedFiles=new List<string>();int done=0;foreach(var item in chosen){if(stopped)break;string result;try{result=CareScan.Apply(item,root);}catch(Exception ex){result=ex.Message;}if(result=="已移动"||result=="已移入回收站"){done++;completedFiles.Add(item.Path);}outcomes.Add(new{item=item,result=result});try{File.WriteAllText(audit,Dock.Json.Serialize(new{state="processed",time=DateTime.UtcNow,authorized=chosen,items=outcomes}));}catch{break;}}if(!stopped)Dispatcher.BeginInvoke(new Action(()=>{busy=false;status.Text="已处理 "+done+" / "+chosen.Length+" 项。记录："+audit;if(done>0&&mode!="desktop")dock.AnimateCleanup(completedFiles[0],PointToScreen(new Point(Width*.4,235)));rows.Children.Clear();selections.Clear();UpdateCount();}));});worker.IsBackground=true;worker.SetApartmentState(ApartmentState.STA);worker.Start();
     }
 }
 public partial class Dock {public void OpenCare(){new CareWindow(this).Show();}}

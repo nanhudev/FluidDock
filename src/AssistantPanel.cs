@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Diagnostics;
 
-public static class ThemeState {public static bool Light;}
+public static class ThemeState {public static bool Light,ReducedMotion;}
 public static partial class Native {
     public static void SetAppearance(Window window,string theme){
         var h=new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
@@ -23,7 +23,7 @@ public partial class SearchPanel {
         var stack=new StackPanel();assistantRoot.Child=stack;
         var heading=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,8)};heading.Children.Add(new BuddyFace());stack.Children.Add(heading);
         assistantText=Dock.Text("试试添加软件、调整顺序、改变风格或大小。",14,"#D2DDEB");assistantText.TextWrapping=TextWrapping.Wrap;assistantText.LineHeight=25;assistantText.Margin=new Thickness(0,10,0,18);stack.Children.Add(assistantText);
-        apply=new Button{Content="应用这个操作",Padding=new Thickness(18,11,18,11),HorizontalAlignment=HorizontalAlignment.Left,IsEnabled=false};Dock.ButtonStyle(apply,false);apply.Background=Dock.B("#ADDCD5");apply.Foreground=Dock.B("#203638");apply.Click+=(s,e)=>RunAssistant();stack.Children.Add(apply);
+        apply=new Button{Content="应用这个操作",Padding=new Thickness(18,11,18,11),HorizontalAlignment=HorizontalAlignment.Left,IsEnabled=false};Dock.ButtonStyle(apply,false);FluidMotion.Press(apply);apply.Background=Dock.B("#ADDCD5");apply.Foreground=Dock.B("#203638");apply.Click+=(s,e)=>RunAssistant();stack.Children.Add(apply);
         var chips=new WrapPanel{Margin=new Thickness(0,22,0,0)};foreach(string sample in new[]{"一键配置","清理电脑","图标小一点","撤销"}){string text=sample;var b=new Button{Content=sample,Padding=new Thickness(10,7,10,7),Margin=new Thickness(0,0,8,8),FontSize=11};Dock.ButtonStyle(b);b.Click+=(s,e)=>{input.Text=text;input.Focus();};chips.Children.Add(b);}stack.Children.Add(chips);body.Children.Add(assistantRoot);
         var assistant=new Button{Content="✦ 助手",Padding=new Thickness(9,7,9,7),FontSize=11};Dock.ButtonStyle(assistant);DockPanel.SetDock(assistant,System.Windows.Controls.Dock.Right);bottom.Children.Insert(0,assistant);assistant.Click+=(s,e)=>SetMode("assistant");
         var remove=new Button{Content="− 管理",Padding=new Thickness(9,7,9,7),FontSize=11};Dock.ButtonStyle(remove);DockPanel.SetDock(remove,System.Windows.Controls.Dock.Right);bottom.Children.Insert(0,remove);remove.Click+=(s,e)=>SetMode("remove");

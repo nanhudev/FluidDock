@@ -4,7 +4,8 @@
   "description": "Native DockBot walkthrough and minimal beat-synced promo",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "render": "remotion render src/index.tsx DockBotPromo ../artifacts/DockBot-Promo.mp4 --codec h264 --crf 17 --concurrency 2",
+    "preview": "remotion studio src/index.tsx"
   },
   "keywords": [],
   "author": "",

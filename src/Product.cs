@@ -149,11 +149,12 @@ public partial class Dock {
         catch{Entries=snapshot.Apps;Settings=snapshot.Settings;throw;}
         undo.Push(snapshot);
         if(plan.Intent=="sort"&&plan.Group=="")SortSmart(false);
+        if(animate&&!Settings.ReducedMotion){if(plan.Intent=="batch")foreach(var item in plan.Steps)carryingNames.Add(item.AppName);else if(new[]{"add","move","group"}.Contains(plan.Intent))carryingNames.Add(plan.AppName);}
         SaveApps();Persist();ApplyAppearance();Rebuild();SyncWidget();if(bindings!=null){bindings.ResetWatchers();bindings.Request();}if(plan.Intent=="startup")SyncStartup();
         var changed=Entries.FirstOrDefault(e=>e.Name==plan.AppName);
         if(animate&&!Settings.ReducedMotion&&plan.Intent=="batch"){
             int index=0;foreach(var name in plan.Steps.Select(p=>p.AppName).Distinct()){
-                var entry=Entries.FirstOrDefault(e=>e.Name==name);if(entry==null)continue;var copy=entry;var tick=new System.Windows.Threading.DispatcherTimer{Interval=TimeSpan.FromMilliseconds(1+index++*160)};tick.Tick+=(s,e)=>{tick.Stop();if(closing)return;var start=search!=null&&search.IsVisible?search.PointToScreen(new Point(search.Width*.52,search.Height*.65)):PointToScreen(new Point(Width/2,20));CarryOverlay.Animate(this,copy,start,IconDestination(copy),false);};tick.Start();
+                var entry=Entries.FirstOrDefault(e=>e.Name==name);if(entry==null)continue;var copy=entry;if(RecordingDemo){int delay=index++*96;DemoSchedule(delay,()=>{var start=search.PointToScreen(new Point(search.Width*.52,search.Height*.65));CarryOverlay.Animate(this,copy,start,IconDestination(copy),false);});continue;}var tick=new System.Windows.Threading.DispatcherTimer{Interval=TimeSpan.FromMilliseconds(1+index++*160)};tick.Tick+=(s,e)=>{tick.Stop();if(closing)return;var start=search!=null&&search.IsVisible?search.PointToScreen(new Point(search.Width*.52,search.Height*.65)):PointToScreen(new Point(Width/2,20));CarryOverlay.Animate(this,copy,start,IconDestination(copy),false);};tick.Start();
             }
         }
         if(animate&&!Settings.ReducedMotion&&changed!=null&&plan.Intent!="batch"){
@@ -182,7 +183,7 @@ public partial class Dock {
     void ApplyAppearance(){
         double scale=Math.Max(.65,Math.Min(1.4,Settings.DockScale));Settings.DockScale=scale;
         canvas.Height=156;canvas.VerticalAlignment=VerticalAlignment.Bottom;canvas.RenderTransformOrigin=new Point(.5,1);canvas.RenderTransform=new ScaleTransform(scale,scale);Height=156*Math.Max(1,scale);
-        bool light=Settings.Appearance=="light",solid=Settings.Appearance=="graphite";ThemeState.Light=light;caption.Background=B(light?"#EEF0F4FA":"#E5252932");captionText.Foreground=B(light?"#253247":"#FFFFFF");
+        bool light=Settings.Appearance=="light",solid=Settings.Appearance=="graphite";ThemeState.Light=light;ThemeState.ReducedMotion=Settings.ReducedMotion;caption.Background=B(light?"#EEF0F4FA":"#E5252932");captionText.Foreground=B(light?"#253247":"#FFFFFF");
         rim.Background=solid?B("#FF202630"):PanelChrome.Material(light);Native.SetAppearance(glass,Settings.Appearance);
         if(search!=null)search.ApplyTheme(Settings.Appearance);if(widget!=null)Native.SetAppearance(widget,Settings.Appearance);Place();
     }

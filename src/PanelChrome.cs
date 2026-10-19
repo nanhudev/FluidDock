@@ -10,10 +10,11 @@ public static class PanelChrome {
     public static Brush Material(bool light){var b=new LinearGradientBrush(light?Color.FromArgb(230,240,241,245):Color.FromArgb(224,42,44,50),light?Color.FromArgb(210,223,227,235):Color.FromArgb(205,24,26,31),90);b.Freeze();return b;}
     public static void Attach(Window window,FrameworkElement body,Dock dock){
         window.Background=Brushes.Transparent;window.Content=null;var frame=new Border{CornerRadius=new CornerRadius(24),Background=Material(dock.Settings.Appearance=="light")};var stack=new Grid();frame.Child=stack;stack.Children.Add(body);
-        var close=new Button{Content="×",FontSize=19,Width=30,Height=30,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,14,14,0)};Dock.ButtonStyle(close);close.Click+=(s,e)=>window.Close();stack.Children.Add(close);window.Content=frame;
+        var close=new Button{Content="×",FontSize=19,Width=30,Height=30,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,14,14,0)};Dock.ButtonStyle(close);close.Click+=(s,e)=>window.Close();stack.Children.Add(close);window.Content=frame;SearchPanel.PaintText(frame,dock.Settings.Appearance=="light");
         window.PreviewKeyDown+=(s,e)=>{if(e.Key==Key.Escape){window.Close();e.Handled=true;}};
         window.MouseLeftButtonDown+=(s,e)=>{if(e.GetPosition(window).Y<58&&e.OriginalSource is TextBlock)window.DragMove();};
-        window.Loaded+=(s,e)=>{if(dock.Settings.ReducedMotion)return;var scale=new ScaleTransform(.98,.98);var move=new TranslateTransform(0,7);var transform=new TransformGroup();transform.Children.Add(scale);transform.Children.Add(move);frame.RenderTransformOrigin=new Point(.5,.5);frame.RenderTransform=transform;var ease=new CubicEase{EasingMode=EasingMode.EaseOut};var span=TimeSpan.FromMilliseconds(230);scale.BeginAnimation(ScaleTransform.ScaleXProperty,new DoubleAnimation(1,span){EasingFunction=ease});scale.BeginAnimation(ScaleTransform.ScaleYProperty,new DoubleAnimation(1,span){EasingFunction=ease});move.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(0,span){EasingFunction=ease});};
+        window.Loaded+=(s,e)=>{if(!dock.Settings.ReducedMotion&&!dock.RecordingDemo)FluidMotion.Reveal(frame);};
+        bool closing=false,allowed=false;window.Closing+=(s,e)=>{if(allowed||dock.ClosingDock||dock.RecordingDemo||dock.Settings.ReducedMotion||!window.IsVisible)return;e.Cancel=true;if(closing)return;closing=true;FluidMotion.Exit(frame,()=>{allowed=true;window.Close();});};
     }
 }
 public partial class Dock {
