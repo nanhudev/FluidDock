@@ -60,6 +60,8 @@ irm https://raw.githubusercontent.com/nanhudev/dockbot/main/Install-Online.ps1 |
 
 ## 演示
 
+[17 KB 卖点短片](https://github.com/nanhudev/dockbot/releases/download/v0.2.0-preview.1/V1_GitHub_17KB.mp4) · [7 个竖版、封面与字幕](https://github.com/nanhudev/dockbot/releases/download/v0.2.0-preview.1/DockBot-Shorts-7Pack.zip)
+
 [![交互演示](docs/media/teaser.gif)](https://github.com/nanhudev/dockbot/releases/download/v0.1.1-preview.1/DockBot-Promo.mp4)
 
 宣传片使用演示配置。
