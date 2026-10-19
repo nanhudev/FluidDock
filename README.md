@@ -5,14 +5,14 @@
 
 Windows 桌面助手 · 圆角玻璃 Dock · 17 KB 本地意图模型
 
-[下载 EXE](https://github.com/nanhudev/dockbot/releases/download/v0.2.0-preview.1/DockBot.exe) · [28 秒速览](https://github.com/nanhudev/dockbot/releases/download/v0.1.1-preview.1/DockBot-Short.mp4) · [完整宣传片](https://github.com/nanhudev/dockbot/releases/download/v0.1.1-preview.1/DockBot-Promo.mp4)
+[下载 EXE](https://github.com/nanhudev/dockbot/releases/download/v0.2.0-preview.2/DockBot.exe) · [使用指令](docs/intents.md)
 </div>
 
 ![dockbot](docs/media/overview.png)
 
 ## 安装
 
-下载 [DockBot.exe](https://github.com/nanhudev/dockbot/releases/download/v0.2.0-preview.1/DockBot.exe)，双击运行。Windows 10 / 11，.NET Framework 4.8。
+下载 [DockBot.exe](https://github.com/nanhudev/dockbot/releases/download/v0.2.0-preview.2/DockBot.exe)，双击运行。Windows 10 / 11，.NET Framework 4.8。
 
 PowerShell 一行安装：
 
@@ -58,13 +58,7 @@ irm https://raw.githubusercontent.com/nanhudev/dockbot/main/Install-Online.ps1 |
 
 [完整指令列表](docs/intents.md) · [助手实现](docs/assistant-design.md)
 
-## 演示
-
-[17 KB 卖点短片](https://github.com/nanhudev/dockbot/releases/download/v0.2.0-preview.1/V1_GitHub_17KB.mp4) · [7 个竖版、封面与字幕](https://github.com/nanhudev/dockbot/releases/download/v0.2.0-preview.1/DockBot-Shorts-7Pack.zip)
-
-[![交互演示](docs/media/teaser.gif)](https://github.com/nanhudev/dockbot/releases/download/v0.1.1-preview.1/DockBot-Promo.mp4)
-
-宣传片使用演示配置。
+## 界面
 
 ![一键配置](docs/media/setup.png)
 ![本地助手](docs/media/assistant.png)
@@ -79,6 +73,15 @@ npm run package
 ```
 
 WPF / Win32 · C# 5 · 约 17 KB 字符 n-gram 模型，19 个模型标签与扩展规则。
+
+```text
+src/       应用源码
+tests/     回归与界面检查
+models/    意图模型与训练数据
+tools/     构建打包与模型训练工具
+assets/    产品图标
+docs/      使用指令、设计文档与截图
+```
 
 ## License
 

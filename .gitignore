@@ -18,6 +18,6 @@ artifacts/
 film/public/fonts/
 film/public/*.wav
 film/public/native-demo.mp4
-film/shorts/exports/
+film/
 
 .npm-cache/

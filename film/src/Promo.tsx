@@ -1,1 +1,0 @@
-export {Promo} from './MinimalPromo';

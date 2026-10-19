@@ -1,12 +1,12 @@
 {
   "name": "dockbot-windows",
-  "version": "0.2.0-preview.1",
+  "version": "0.2.0-preview.2",
   "private": true,
   "description": "Native Windows DockBot build and release commands",
   "license": "MIT",
   "scripts": {
     "build": "powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1",
     "test": "powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1 -Test",
-    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1 -Version 0.2.0-preview.1 -Refresh"
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1 -Version 0.2.0-preview.2 -Refresh"
   }
 }

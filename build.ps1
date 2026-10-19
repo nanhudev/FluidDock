@@ -6,7 +6,7 @@ if(!(Test-Path (Join-Path $framework 'csc.exe'))){$framework=Join-Path $env:WIND
 $out=Join-Path $root 'bin'
 New-Item -ItemType Directory -Path $out -Force | Out-Null
 $refs=@('WindowsBase.dll','PresentationCore.dll','PresentationFramework.dll')|ForEach-Object {'/r:'+(Join-Path $framework ('WPF\'+$_))}
-$sources=@(Get-ChildItem (Join-Path $root 'src') -Filter '*.cs'|ForEach-Object FullName)
+$sources=@(Get-ChildItem @((Join-Path $root 'src'),(Join-Path $root 'tests')) -Filter '*.cs'|ForEach-Object FullName)
 $model=Join-Path $root 'models\intent-model.json.gz'
 & (Join-Path $framework 'csc.exe') /nologo /target:winexe /platform:anycpu /optimize+ /out:"$out\DockBot.exe" /win32icon:"$root\assets\buddy.ico" /win32manifest:"$root\app.manifest" /resource:"$model,FluidDock.IntentModel.gz" /r:System.Xaml.dll /r:System.Web.Extensions.dll /r:System.Data.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:Microsoft.CSharp.dll @refs @sources
 if($LASTEXITCODE -ne 0){throw 'Build failed.'}
