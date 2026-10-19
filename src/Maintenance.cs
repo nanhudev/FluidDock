@@ -68,7 +68,7 @@ public sealed class CareWindow:Window {
     public bool HasSelection {get{return selections.Any(p=>p.Item1.IsChecked==true);}}
     readonly Dock dock;readonly StackPanel rows=new StackPanel();readonly TextBlock status;readonly Button execute;readonly List<Tuple<CheckBox,CareItem>> selections=new List<Tuple<CheckBox,CareItem>>();string root,mode;bool stopped,busy;
     public CareWindow(Dock owner){
-        dock=owner;Title="电脑整理";Width=740;Height=640;WindowStartupLocation=WindowStartupLocation.CenterScreen;Background=Dock.B("#202630");Foreground=Brushes.White;FontFamily=new FontFamily("Microsoft YaHei UI");ResizeMode=ResizeMode.CanResize;Closed+=(s,e)=>stopped=true;
+        dock=owner;Title="电脑整理";Width=740;Height=640;WindowStartupLocation=WindowStartupLocation.CenterScreen;Background=Dock.B(owner.Settings.Appearance=="light"?"#E5ECF2":"#202630");Foreground=owner.Settings.Appearance=="light"?Dock.B("#253247"):Brushes.White;FontFamily=new FontFamily("Microsoft YaHei UI");ResizeMode=ResizeMode.CanResize;Closed+=(s,e)=>stopped=true;
         var grid=new Grid{Margin=new Thickness(24)};Content=grid;grid.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});grid.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});grid.RowDefinitions.Add(new RowDefinition());grid.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
         var head=new StackPanel();head.Children.Add(Dock.Text("电脑整理",22,"#F1F5FA"));var actions=new WrapPanel{Margin=new Thickness(0,16,0,12)};head.Children.Add(actions);grid.Children.Add(head);
         AddButton(actions,"桌面归档",()=>Scan("desktop",Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)));AddButton(actions,"用户临时文件",()=>Scan("temp",Path.GetTempPath()));AddButton(actions,"大文件…",PickLarge);AddButton(actions,"已安装应用",ShowApps);
@@ -88,7 +88,7 @@ public sealed class CareWindow:Window {
         mode=kind;root=folder;busy=true;execute.IsEnabled=false;rows.Children.Clear();selections.Clear();status.Text="正在扫描："+folder;
         ThreadPool.QueueUserWorkItem(s=>{CareReport report;try{report=CareScan.Scan(kind,folder,()=>stopped);}catch(Exception ex){if(!stopped)Dispatcher.BeginInvoke(new Action(()=>{busy=false;status.Text=ex.Message;}));return;}if(stopped)return;Dispatcher.BeginInvoke(new Action(()=>{
             busy=false;status.Text=(kind=="desktop"?"只移动所选文件，文件夹与程序保留。":kind=="temp"?"仅用户临时目录，超过 7 天的临时文件。": "≥250 MB，大小不代表可删除。请核对内容。")+"\n"+report.Items.Count+" 项 · "+CareScan.Size(report.Items.Sum(i=>i.Bytes))+" · 跳过 "+report.Skipped+" 个无法访问或受保护位置"+(report.Limited?" · 已达扫描上限，可选择更小的文件夹":"")+"\n移入回收站后不会立即释放空间；清空回收站需自行操作。";
-            foreach(var item in report.Items){var cb=new CheckBox{Content=new TextBlock{Text=item.Label,TextWrapping=TextWrapping.Wrap,Foreground=Brushes.White,FontSize=12},Margin=new Thickness(4,10,4,10),IsChecked=false};cb.Checked+=(a,b)=>UpdateCount();cb.Unchecked+=(a,b)=>UpdateCount();selections.Add(Tuple.Create(cb,item));rows.Children.Add(cb);}UpdateCount();
+            foreach(var item in report.Items){var cb=new CheckBox{Content=new TextBlock{Text=item.Label,TextWrapping=TextWrapping.Wrap,Foreground=Foreground,FontSize=12},Margin=new Thickness(4,10,4,10),IsChecked=false};cb.Checked+=(a,b)=>UpdateCount();cb.Unchecked+=(a,b)=>UpdateCount();selections.Add(Tuple.Create(cb,item));rows.Children.Add(cb);}UpdateCount();
         }));});
     }
     void UpdateCount(){int n=selections.Count(p=>p.Item1.IsChecked==true);execute.Content="处理勾选项（"+n+"）";execute.IsEnabled=!busy&&n>0;}
@@ -103,4 +103,5 @@ public sealed class CareWindow:Window {
     }
 }
 public partial class Dock {public void OpenCare(){new CareWindow(this).Show();}}
+
 
