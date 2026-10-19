@@ -39,7 +39,8 @@ public sealed class DockPlan {
     public string Intent="unknown",AppName="",OtherName="",TargetKey="",Group="",OtherGroup="",Theme="",Direction="",Message="",Source="rules";
     public bool Enable=true;public double Scale,Delta,Confidence=1;
     public Entry ResolvedEntry;
-    public bool Actionable {get{return new[]{"add","remove","move","group","sort","theme","size","autohide","startup","widget","tracking","undo","open","close","configure","care"}.Contains(Intent);}}
+    public List<DockPlan> Steps;
+    public bool Actionable {get{return new[]{"add","remove","move","group","sort","theme","size","autohide","startup","widget","tracking","undo","open","close","configure","care","batch"}.Contains(Intent);}}
 }
 public sealed class DockIntent {
     readonly IntentModel model=new IntentModel();
@@ -66,7 +67,7 @@ public sealed class DockIntent {
         else if(Has(q,@"智能整理|使用频率|常用.{0,6}(前|左)|使用时长.{0,5}(排|序)|分类.{0,4}(排序|先|前)|分组.{0,8}(前|后)|先.+再|sort|排整齐"))p.Intent="sort";
         else if(Has(q,@"打开|开一下|启动|运行|\bopen\b|\blaunch\b")&&!Has(q,@"位置|路径|指向|哪里|在哪"))p.Intent="open";
         else if(Has(q,@"移除|取消固定|删掉|删除|拿掉|去掉|撤下|扔掉|丢出去|别显示|不保留|unpin|remove"))p.Intent="remove";
-        else if(Has(q,@"添加|固定|加入|加一个|加个|加上|帮我加|给我加|^加|钉住|放进|放上来|收进|常驻|\bpin\b|\badd\b"))p.Intent="add";
+        else if(Has(q,@"添加|固定|加入|加一个|加个|加上|加一下|再加|帮我加|给我加|^加|钉住|放进|放上来|收进|常驻|\bpin\b|\badd\b"))p.Intent="add";
         else if(Has(q,@"分类|归到|归入|分到|属于|分组|算办公|group"))p.Intent="group";
         else if(Has(q,@"最前|最后|往左|往右|向左|向右|左边|右边|之前|之后|前面|后面|前边|后边|挪|搬|交换|顺序|\bmove\b"))p.Intent="move";
         else if(Has(q,@"搜索|查找|定位|路径|哪里|在哪|指向|快捷方式|\bexe\b|\bfind\b|\bsearch\b"))p.Intent="search";
@@ -81,13 +82,18 @@ public sealed class DockIntent {
         if(resolved.Ambiguous){p.Intent="unknown";p.Message=resolved.Message;return p;}
         if(resolved.Matches.Count>0){p.AppName=resolved.Matches[0].Name;p.TargetKey=AppCatalog.Key(resolved.Matches[0]);p.Confidence=Math.Min(p.Confidence,resolved.Confidence);}
         if(resolved.Matches.Count>1)p.OtherName=resolved.Matches[1].Name;
-        if(resolved.Matches.Count>1&&p.Intent!="move"){p.Intent="unknown";p.Message="这句话包含多个软件。请逐个操作，避免误改。";return p;}
+        if(resolved.Matches.Count>1&&!new[]{"move","add","group"}.Contains(p.Intent)){p.Intent="unknown";p.Message="请逐个操作。";return p;}
         foreach(var app in resolved.Matches)foreach(string alias in SoftwareResolver.Aliases(app))normalized=normalized.Replace(IntentModel.Normalize(alias),"");
         var groups=new Dictionary<string,string>{{"ai","AI"},{"人工智能","AI"},{"办公","办公"},{"开发","开发"},{"音乐","音乐"},{"网站","常用网站"},{"游戏","游戏"},{"其他工具","其他工具"},{"工具","其他工具"},{"系统","系统"}};
         var groupMatches=groups.Where(g=>normalized.Contains(g.Key)).OrderBy(g=>normalized.IndexOf(g.Key,StringComparison.Ordinal)).Select(g=>g.Value).Distinct().ToArray();
         if(groupMatches.Length>0)p.Group=groupMatches[0];if(groupMatches.Length>1)p.OtherGroup=groupMatches[1];
         p.Direction=Has(q,"最后|末尾|end|last")?"last":Has(q,"最前|首位|第一|first")?"first":Has(q,"右|之后|后面|后边|after|right")?"after":"before";
         if(p.Intent=="move"&&p.AppName==""&&p.Group!="")p.Intent="sort";
+        if(resolved.Matches.Count>1&&(p.Intent=="add"||p.Intent=="group")){
+            if(resolved.Matches.Count>4||(p.Intent=="group"&&p.Group=="")){p.Intent="unknown";p.Message="请指定分类，最多四个软件。";return p;}
+            var steps=new List<DockPlan>();foreach(var entry in resolved.Matches){if(p.Intent=="add"||!entry.Pinned)steps.Add(new DockPlan{Intent="add",AppName=entry.Name,TargetKey=AppCatalog.Key(entry),ResolvedEntry=entry,Group=p.Group});if(p.Intent=="group")steps.Add(new DockPlan{Intent="group",AppName=entry.Name,TargetKey=AppCatalog.Key(entry),Group=p.Group});}
+            p.Intent="batch";p.Steps=steps;return p;
+        }
         if(p.Intent=="theme"){
             p.Theme=Has(q,"石墨|纯色|不透明|graphite|不要毛玻璃")?"graphite":Has(q,"浅色|亮色|light")?"light":Has(q,"深色|暗色|黑色|磨砂|毛玻璃|透明|dark|glass")?"glass":"";
             if(p.Theme==""){p.Intent="help";p.Message="可以选择：深色磨砂、浅色玻璃、石墨。";}

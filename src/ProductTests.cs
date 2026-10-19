@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -34,7 +34,7 @@ public static class ProductTests {
             new Case("显示时钟小组件","widget"),new Case("隐藏桌面时钟","widget"),new Case("开启使用统计","tracking"),new Case("关闭点击统计","tracking"),
             new Case("撤销刚才的操作","undo"),new Case("微信的exe在哪里","search","微信"),new Case("你能做什么","help"),
             new Case("帮我卸载QQ","unknown"),new Case("执行powershell命令","unknown"),new Case("删除磁盘上的文件","unknown"),new Case("不要删除QQ","unknown"),new Case("别缩小图标","unknown"),new Case("不要关闭自动隐藏","unknown"),
-            new Case("添加QQ和微信","unknown"),new Case("图标设置成500%","unknown"),new Case("添加一个不存在的软件xyz987","unknown"),new Case("今天天气怎么样","unknown")
+            new Case("添加QQ和微信","batch"),new Case("图标设置成500%","unknown"),new Case("添加一个不存在的软件xyz987","unknown"),new Case("今天天气怎么样","unknown")
         };
         foreach(var c in cases){var p=engine.Parse(c.Text,catalog);check("intent:"+c.Text,p.Intent==c.Intent&&(c.App==""||p.AppName==c.App),p.Intent+" / "+p.AppName+" / "+p.Source+" / "+p.Message);}
         foreach(var c in new[]{new Case("帮我打开微信","open","微信"),new Case("开一下QQ","open","QQ"),new Case("关掉微信","close","微信"),new Case("关闭时钟小组件","widget"),new Case("打开时钟小组件","widget"),new Case("帮我把飞书加入","add","Feishu"),new Case("帮我加Feishu","add","Feishu"),new Case("清理C盘","care"),new Case("清理大文件","care"),new Case("帮忙整理桌面","care"),new Case("不要清理C盘","unknown"),new Case("一键配置dock","configure"),new Case("添加moodle","unknown")}){var p=engine.Parse(c.Text,catalog);check("extended-intent:"+c.Text,p.Intent==c.Intent&&(c.App==""||p.AppName==c.App),p.Intent+" / "+p.AppName);}
@@ -42,6 +42,10 @@ public static class ProductTests {
         foreach(var item in new[]{Tuple.Create("帮我把um moodle加入到dock","https://ummoodle.um.edu.mo/"),Tuple.Create("把si web加入dock","https://isw.um.edu.mo/siweb/"),Tuple.Create("添加 https://example.com/","https://example.com/")}){var p=engine.Parse(item.Item1,catalog);var entries=new List<Entry>();CommandActions.Apply(p,entries,new Prefs(),catalog);check("website:"+item.Item1,p.Intent=="add"&&entries.Count==1&&entries[0].Target==item.Item2&&entries[0].Group=="常用网站"&&entries[0].Pinned,p.Intent);}
         check("no-unsafe-website",Websites.Resolve("添加 javascript:alert(1)")==null&&Websites.Resolve("添加 file:///C:/Windows/system.ini")==null,"only http(s) websites");
         check("usage-consent-default",Recommendations.ReadUsage(false).Count==0,"no consent means no UserAssist read");
+        var multi=new List<Entry>{new Entry{Name="Cursor",Target=@"Z:\Apps\Cursor.exe",Group="AI"},new Entry{Name="WorkBuddy",Target=@"Z:\Apps\WorkBuddy.exe",Group="AI"},new Entry{Name="Blender",Target=@"Z:\Apps\blender.exe",Group="开发"},new Entry{Name="UE5",Target=@"Z:\Apps\UnrealEditor.exe",Group="开发"}};
+        var composite=engine.Parse("帮我再加一下 Cursor 和 WorkBuddy",multi);var compositeState=new List<Entry>();CommandActions.Apply(composite,compositeState,new Prefs(),multi);check("two-app-add",composite.Intent=="batch"&&compositeState.Count==2&&compositeState.All(e=>e.Pinned),"two recognized apps, one reviewed operation");
+        var grouping=engine.Parse("把 Blender 新开一个开发分组，UE5 也放进去",multi);CommandActions.Apply(grouping,compositeState,new Prefs(),multi);check("create-development-section",grouping.Intent=="batch"&&compositeState.Count(e=>e.Group=="开发"&&e.Pinned)==2,"create a visible group by adding its first apps");
+        int beforeComposite=compositeState.Count;try{CommandActions.Apply(new DockPlan{Intent="batch",Steps=new List<DockPlan>{new DockPlan{Intent="add",AppName="Fixture",ResolvedEntry=new Entry{Name="Fixture",Target=@"Z:\Fixture.exe"}},new DockPlan{Intent="group",AppName="absent",Group="开发"}}},compositeState,new Prefs(),multi);}catch{}check("batch-atomic",compositeState.Count==beforeComposite&&!compositeState.Any(e=>e.Name=="Fixture"),"invalid second action leaves the first unapplied");
         foreach(string name in new[]{"Steinberg Download Assistant","ASIO Driver","Visual C++ Redistributable","应用安装器","Setup.exe","声卡控制面板"})check("recommend-exclusion:"+name,!Recommendations.HumanApp(new Entry{Name=name,Target=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"notepad.exe")}),"background infrastructure must not be recommended");
         try{
             var fixture=Path.Combine(output,"care-fixture-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(fixture);var file=Path.Combine(fixture,"my-paper.txt");File.WriteAllText(file,"keep my work");var report=CareScan.Scan("desktop",fixture,()=>false);check("care-scan-read-only",File.Exists(file)&&report.Items.Count==1&&!Directory.Exists(Path.Combine(fixture,"Dock 整理")),"scan must not mutate");

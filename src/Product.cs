@@ -22,7 +22,8 @@ public static class ProductData {
     public static string InstanceSuffix(){if(!Environment.GetCommandLineArgs().Contains("--data-dir"))return "";using(var sha=System.Security.Cryptography.SHA256.Create())return "."+BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(Location().ToLowerInvariant()))).Replace("-","").Substring(0,12);}
     public static string Location(){
         var args=Environment.GetCommandLineArgs();int i=Array.IndexOf(args,"--data-dir");
-        string folder=i>=0&&i+1<args.Length?Path.GetFullPath(args[i+1]):Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"FluidDock");
+        string local=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),legacy=Path.Combine(local,"FluidDock");
+        string folder=i>=0&&i+1<args.Length?Path.GetFullPath(args[i+1]):File.Exists(Path.Combine(legacy,"apps.json"))?legacy:Path.Combine(local,"DockBot");
         Directory.CreateDirectory(folder);Directory.CreateDirectory(Path.Combine(folder,"icons"));return folder;
     }
     public static void Ensure(string home){
@@ -33,6 +34,10 @@ public static class ProductData {
 public sealed class DockSnapshot {public List<Entry> Apps;public Prefs Settings;}
 public static class CommandActions {
     public static string Apply(DockPlan plan,List<Entry> entries,Prefs settings,IEnumerable<Entry> catalog){
+        if(plan.Intent=="batch"){
+            if(plan.Steps==null||plan.Steps.Count==0||plan.Steps.Count>8||plan.Steps.Any(s=>!new[]{"add","group"}.Contains(s.Intent)))throw new InvalidOperationException("不支持组合执行这些操作。");
+            var draft=Dock.Json.Deserialize<List<Entry>>(Dock.Json.Serialize(entries));foreach(var step in plan.Steps)Apply(step,draft,settings,catalog);entries.Clear();entries.AddRange(draft);return "已应用";
+        }
         var app=entries.FirstOrDefault(e=>String.Equals(e.Name,plan.AppName,StringComparison.OrdinalIgnoreCase));
         if(plan.Intent=="add"){
             var candidate=plan.ResolvedEntry??catalog.FirstOrDefault(e=>plan.TargetKey!=""?AppCatalog.Key(e)==plan.TargetKey:String.Equals(e.Name,plan.AppName,StringComparison.OrdinalIgnoreCase));
@@ -40,6 +45,7 @@ public static class CommandActions {
             if(app==null)app=entries.FirstOrDefault(e=>AppCatalog.Key(e)==AppCatalog.Key(candidate)||(!File.Exists(e.Target)&&e.Group!="系统"&&SoftwareResolver.Canonical(e)==SoftwareResolver.Canonical(candidate)));
             if(app==null){app=Dock.Json.Deserialize<Entry>(Dock.Json.Serialize(candidate));entries.Add(app);}
             else if(plan.ResolvedEntry!=null||!File.Exists(app.Target)){app.Target=candidate.Target;app.Arguments=candidate.Arguments;app.WorkDir=candidate.WorkDir;app.Icon=candidate.Icon;app.SourceShortcut=candidate.SourceShortcut;app.Fingerprint="";app.BindingStatus="ready";}
+            if(!String.IsNullOrEmpty(plan.Group)){if(!new[]{"AI","办公","开发","音乐","游戏","常用网站","其他工具"}.Contains(plan.Group))throw new InvalidOperationException("未知分类。");app.Group=plan.Group;}
             app.Pinned=true;app.Hidden=false;return "已添加 "+app.Name;
         }
         if(plan.Intent=="remove"){
@@ -109,11 +115,11 @@ public partial class Dock {
         toggleWait=ThreadPool.RegisterWaitForSingleObject(toggleEvent,(s,t)=>Dispatcher.BeginInvoke(new Action(ToggleSearch)),null,Timeout.Infinite,false);
         Closed+=(s,e)=>{if(toggleWait!=null)toggleWait.Unregister(null);toggleEvent.Dispose();};
         if(!HotkeyRegistered){var handle=new WindowInteropHelper(this).Handle;HotkeyRegistered=Native.RegisterHotKey(handle,71,0x4003,0x20);ShortcutLabel="Ctrl + Alt + 空格";}
-        if(SmokeUi)Settings.Widget=false;tray.Text="FluidDock · "+ShortcutLabel;Loaded+=(s,e)=>{ApplyAppearance();bindings=new BindingMonitor(this);StartCatalog();if(SmokeUi){var start=new System.Windows.Threading.DispatcherTimer{Interval=TimeSpan.FromSeconds(2)};start.Tick+=(a,b)=>{start.Stop();RunUiSmoke();};start.Start();}};Closed+=(s,e)=>{if(bindings!=null)bindings.Dispose();};
+        if(SmokeUi||RecordingDemo)Settings.Widget=false;tray.Text="DockBot · "+ShortcutLabel;Loaded+=(s,e)=>{ApplyAppearance();if(!RecordingDemo&&Settings.StartWithWindows)SyncStartup();if(!RecordingDemo)bindings=new BindingMonitor(this);StartCatalog();if(RecordingDemo)BeginDemoRecording();if(SmokeUi){var start=new System.Windows.Threading.DispatcherTimer{Interval=TimeSpan.FromSeconds(2)};start.Tick+=(a,b)=>{start.Stop();RunUiSmoke();};start.Start();}};Closed+=(s,e)=>{if(bindings!=null)bindings.Dispose();};
     }
     DateTime lastCatalogScan=DateTime.MinValue;bool indexing;
     internal void StartCatalog(){
-        if(SmokeUi){string system=Environment.GetFolderPath(Environment.SpecialFolder.System);installed=new[]{"notepad.exe","calc.exe"}.Select(f=>AppCatalog.FromFile(Path.Combine(system,f))).ToList();CatalogReady=true;return;}
+        if(RecordingDemo){CatalogReady=true;return;}if(SmokeUi){string system=Environment.GetFolderPath(Environment.SpecialFolder.System);installed=new[]{"notepad.exe","calc.exe"}.Select(f=>AppCatalog.FromFile(Path.Combine(system,f))).ToList();CatalogReady=true;return;}
         if(indexing||(DateTime.UtcNow-lastCatalogScan).TotalSeconds<10)return;indexing=true;lastCatalogScan=DateTime.UtcNow;
         var roots=Settings.SearchRoots;
         var thread=new Thread(()=>{
@@ -145,7 +151,12 @@ public partial class Dock {
         if(plan.Intent=="sort"&&plan.Group=="")SortSmart(false);
         SaveApps();Persist();ApplyAppearance();Rebuild();SyncWidget();if(bindings!=null){bindings.ResetWatchers();bindings.Request();}if(plan.Intent=="startup")SyncStartup();
         var changed=Entries.FirstOrDefault(e=>e.Name==plan.AppName);
-        if(animate&&!Settings.ReducedMotion&&changed!=null){
+        if(animate&&!Settings.ReducedMotion&&plan.Intent=="batch"){
+            int index=0;foreach(var name in plan.Steps.Select(p=>p.AppName).Distinct()){
+                var entry=Entries.FirstOrDefault(e=>e.Name==name);if(entry==null)continue;var copy=entry;var tick=new System.Windows.Threading.DispatcherTimer{Interval=TimeSpan.FromMilliseconds(1+index++*160)};tick.Tick+=(s,e)=>{tick.Stop();if(closing)return;var start=search!=null&&search.IsVisible?search.PointToScreen(new Point(search.Width*.52,search.Height*.65)):PointToScreen(new Point(Width/2,20));CarryOverlay.Animate(this,copy,start,IconDestination(copy),false);};tick.Start();
+            }
+        }
+        if(animate&&!Settings.ReducedMotion&&changed!=null&&plan.Intent!="batch"){
             var start=from??(search!=null&&search.IsVisible?search.PointToScreen(new Point(search.Width/2,search.Height*.7)):PointToScreen(new Point(Width/2,30)));
             var finish=plan.Intent=="remove"?TrashScreenPoint():IconDestination(changed);
             CarryOverlay.Animate(this,changed,start,finish,plan.Intent=="remove");
@@ -155,8 +166,9 @@ public partial class Dock {
     void SyncStartup(){
         // Alternate data directories are isolated previews/tests, never the user's startup entry.
         if(ProductData.InstanceSuffix()!="")return;
-        string path=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup),"Fluid Dock.lnk");
+        string path=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup),"DockBot.lnk");
         if(!Settings.StartWithWindows){if(File.Exists(path))File.Delete(path);return;}
+        string legacy=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup),"Fluid Dock.lnk");if(File.Exists(legacy))File.Delete(legacy);
         dynamic shell=Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));dynamic link=shell.CreateShortcut(path);
         try{link.TargetPath=System.Reflection.Assembly.GetExecutingAssembly().Location;link.WorkingDirectory=Path.GetDirectoryName(link.TargetPath);link.Description="FluidDock";link.Save();}
         finally{System.Runtime.InteropServices.Marshal.FinalReleaseComObject(link);System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell);}
@@ -171,7 +183,7 @@ public partial class Dock {
         double scale=Math.Max(.65,Math.Min(1.4,Settings.DockScale));Settings.DockScale=scale;
         canvas.Height=156;canvas.VerticalAlignment=VerticalAlignment.Bottom;canvas.RenderTransformOrigin=new Point(.5,1);canvas.RenderTransform=new ScaleTransform(scale,scale);Height=156*Math.Max(1,scale);
         bool light=Settings.Appearance=="light",solid=Settings.Appearance=="graphite";ThemeState.Light=light;caption.Background=B(light?"#EEF0F4FA":"#E5252932");captionText.Foreground=B(light?"#253247":"#FFFFFF");
-        rim.Background=B(light?"#65CFD8E5":solid?"#FF202630":"#37101823");Native.SetAppearance(glass,Settings.Appearance);
+        rim.Background=solid?B("#FF202630"):PanelChrome.Material(light);Native.SetAppearance(glass,Settings.Appearance);
         if(search!=null)search.ApplyTheme(Settings.Appearance);if(widget!=null)Native.SetAppearance(widget,Settings.Appearance);Place();
     }
 }

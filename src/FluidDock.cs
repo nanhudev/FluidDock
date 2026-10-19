@@ -1,4 +1,4 @@
-using System;using System.IO;using System.Linq;using System.Text;using System.Collections.Generic;using System.Diagnostics;using System.Runtime.InteropServices;using System.Threading;using System.Threading.Tasks;using System.Web.Script.Serialization;using System.Windows;using System.Windows.Controls;using System.Windows.Input;using System.Windows.Media;using System.Windows.Media.Animation;using System.Windows.Media.Imaging;using System.Windows.Interop;using System.Windows.Threading;using Forms=System.Windows.Forms;
+﻿using System;using System.IO;using System.Linq;using System.Text;using System.Collections.Generic;using System.Diagnostics;using System.Runtime.InteropServices;using System.Threading;using System.Threading.Tasks;using System.Web.Script.Serialization;using System.Windows;using System.Windows.Controls;using System.Windows.Input;using System.Windows.Media;using System.Windows.Media.Animation;using System.Windows.Media.Imaging;using System.Windows.Interop;using System.Windows.Threading;using Forms=System.Windows.Forms;
 public partial class Entry {public string Name{get;set;}public string Target{get;set;}public string Arguments{get;set;}public string WorkDir{get;set;}public string Icon{get;set;}public string Group{get;set;}public bool Pinned{get;set;}public bool Hidden{get;set;}public string[] ProcessNames{get;set;}}
 public class Use {public int Clicks{get;set;}public double Seconds{get;set;}}
 public partial class Prefs {public bool AutoHide{get;set;}public bool ReducedMotion{get;set;}public bool Adaptive{get;set;}public bool Widget{get;set;}public Prefs(){Adaptive=true;Widget=true;ReducedMotion=!SystemParameters.ClientAreaAnimation;DockScale=1;Appearance="glass";GroupOrder=new[]{"系统","AI","办公","开发","音乐","游戏","常用网站","其他工具"};}}
@@ -25,8 +25,8 @@ public static partial class Native {
  public struct COMPOSITION {public int Attribute;public IntPtr Data;public int Size;}
  public struct MARGINS {public int L,R,T,B;}
  public static bool Glass(Window w){var h=new WindowInteropHelper(w).EnsureHandle();var src=HwndSource.FromHwnd(h);if(src!=null)src.CompositionTarget.BackgroundColor=Colors.Transparent;var margin=new MARGINS{L=-1};DwmExtendFrameIntoClientArea(h,ref margin);
- var accent=new ACCENT{State=4,Flags=2,Color=0xA02E2520,Animation=0};int size=Marshal.SizeOf(accent);IntPtr mem=Marshal.AllocHGlobal(size);bool ok=false;
- try{Marshal.StructureToPtr(accent,mem,false);var c=new COMPOSITION{Attribute=19,Data=mem,Size=size};ok=SetWindowCompositionAttribute(h,ref c)!=0;}finally{Marshal.FreeHGlobal(mem);}int corner=2;DwmSetWindowAttribute(h,33,ref corner,4);int dark=1;DwmSetWindowAttribute(h,20,ref dark,4);int noBorder=unchecked((int)0xFFFFFFFE);DwmSetWindowAttribute(h,34,ref noBorder,4);Round(w);return ok;}
+ var accent=new ACCENT{State=3,Flags=0,Color=0,Animation=0};int size=Marshal.SizeOf(accent);IntPtr mem=Marshal.AllocHGlobal(size);bool ok=false;
+ try{Marshal.StructureToPtr(accent,mem,false);var c=new COMPOSITION{Attribute=19,Data=mem,Size=size};ok=SetWindowCompositionAttribute(h,ref c)!=0;}finally{Marshal.FreeHGlobal(mem);}int corner=1;DwmSetWindowAttribute(h,33,ref corner,4);int dark=1;DwmSetWindowAttribute(h,20,ref dark,4);int noBorder=unchecked((int)0xFFFFFFFE);DwmSetWindowAttribute(h,34,ref noBorder,4);Round(w);return ok;}
  static Dictionary<IntPtr,long> roundedSizes=new Dictionary<IntPtr,long>();
  public static void Round(Window w){var h=new WindowInteropHelper(w).Handle;if(h==IntPtr.Zero||w.Width<=0||w.Height<=0)return;var src=PresentationSource.FromVisual(w);double scale=src==null?1:src.CompositionTarget.TransformToDevice.M11;int width=(int)(w.Width*scale)+1,height=(int)(w.Height*scale)+1;long key=((long)width<<32)|(uint)height;long old;if(roundedSizes.TryGetValue(h,out old)&&old==key)return;roundedSizes[h]=key;var region=CreateRoundRectRgn(0,0,width,height,(int)(28*scale),(int)(28*scale));if(SetWindowRgn(h,region,true)==0)DeleteObject(region);}
 }
@@ -41,14 +41,14 @@ public partial class Dock:Window {
  DispatcherTimer monitor=new DispatcherTimer();Stopwatch time=Stopwatch.StartNew();double last,hide,hideV,hideTarget,baseWidth;bool rendering,dirty,closing;int ticks,dragIndex=-1;uint lastPid;Entry activeEntry;DateTime lastUsage=DateTime.UtcNow;bool resolving;
  public bool HotkeyRegistered;public double LastSearchMs;List<Tile> tiles=new List<Tile>();List<Border> dividers=new List<Border>();long surfaceWrites;bool measureHover;List<double> hoverFrameCosts=new List<double>(256),hoverFrameGaps=new List<double>(256);Stopwatch renderCostWatch=new Stopwatch();
  class Tile {public Entry App;public Button Button;public ScaleTransform Scale;public TranslateTransform Move;public double ScaleNow=1,ScaleV,Target=1,Center,Baseline,Lift,LiftV,Bounce,OffsetX,OffsetV,InitialX=Double.NaN;public Point Down;public bool Pressed;}
- [STAThread]public static void Main(string[] args){if(args.Contains("--self-test")){Environment.Exit(ProductTests.Run(Home));return;}bool first;using(var mutex=new Mutex(true,"Local\\FluidDock.Desktop.v1"+ProductData.InstanceSuffix(),out first)){if(!first){try{using(var signal=EventWaitHandle.OpenExisting("Local\\FluidDock.Toggle"+ProductData.InstanceSuffix()))signal.Set();}catch{}return;}try{var app=new Application{ShutdownMode=ShutdownMode.OnMainWindowClose};Theme(app);app.Run(new Dock(args));}catch(Exception ex){File.AppendAllText(Path.Combine(Home,"error.log"),DateTime.Now+" "+ex+"\r\n");Environment.ExitCode=1;}}}
+ [STAThread]public static void Main(string[] args){if(args.Contains("--record-demo")&&!args.Contains("--data-dir"))return;if(args.Contains("--self-test")){Environment.Exit(ProductTests.Run(Home));return;}bool first;using(var mutex=new Mutex(true,"Local\\FluidDock.Desktop.v1"+ProductData.InstanceSuffix(),out first)){if(!first){try{using(var signal=EventWaitHandle.OpenExisting("Local\\FluidDock.Toggle"+ProductData.InstanceSuffix()))signal.Set();}catch{}return;}try{var app=new Application{ShutdownMode=ShutdownMode.OnMainWindowClose};Theme(app);app.Run(new Dock(args));}catch(Exception ex){File.AppendAllText(Path.Combine(Home,"error.log"),DateTime.Now+" "+ex+"\r\n");Environment.ExitCode=1;}}}
  public Dock(string[] args){
  ProductData.Ensure(Home);Entries=Json.Deserialize<List<Entry>>(File.ReadAllText(Path.Combine(Home,"apps.json")));
  try{Settings=Json.Deserialize<Prefs>(File.ReadAllText(Path.Combine(Home,"preferences.json")));}catch{Settings=new Prefs();}
  try{Usage=Json.Deserialize<Dictionary<string,Use>>(File.ReadAllText(Path.Combine(Home,"usage.json")));}catch{}
  MigrateCategories();if(Settings.Adaptive)SortSmart(false);
- Title="Fluid Dock";Width=SystemParameters.WorkArea.Width-16;Height=156;WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;AllowsTransparency=true;Background=Brushes.Transparent;ShowInTaskbar=false;Topmost=true;ShowActivated=false;
- glass=new GlassWindow{Title="Fluid Dock · Glass",Height=78,Width=900};glass.Show();Owner=glass;
+ Title="DockBot";Width=SystemParameters.WorkArea.Width-16;Height=156;WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;AllowsTransparency=true;Background=Brushes.Transparent;ShowInTaskbar=false;Topmost=true;ShowActivated=false;
+ glass=new GlassWindow{Title="DockBot · Glass",Height=78,Width=900};glass.Show();Owner=glass;
  canvas=new Canvas();Content=canvas;rim=new Border{Height=78,CornerRadius=new CornerRadius(25),BorderThickness=new Thickness(0),BorderBrush=Brushes.Transparent,Background=new LinearGradientBrush(Color.FromArgb(34,24,31,43),Color.FromArgb(55,14,19,29),90)};rim.ContextMenu=Menu();canvas.Children.Add(rim);
  captionText=Text("",12,"#FFFFFF");captionText.Margin=new Thickness(12,6,12,6);caption=new Border{Child=captionText,Background=B("#E5252932"),CornerRadius=new CornerRadius(9),BorderBrush=Brushes.Transparent,BorderThickness=new Thickness(0),Opacity=0,IsHitTestVisible=false};canvas.Children.Add(caption);
  var dropText=Text("＋ 释放以添加到 Dock",14,"#FFFFFF");dropText.Margin=new Thickness(22,12,22,12);dropBadge=new Border{Child=dropText,Background=B("#DC386E8C"),CornerRadius=new CornerRadius(18),Visibility=Visibility.Collapsed,IsHitTestVisible=false};canvas.Children.Add(dropBadge);
@@ -56,7 +56,7 @@ public partial class Dock:Window {
  MouseMove+=(s,e)=>Pointer(e.GetPosition(canvas));MouseLeave+=(s,e)=>{botTarget=18;foreach(var t in tiles)if(!t.Pressed)t.Target=1;caption.Opacity=0;Wake();};
  var handle=new WindowInteropHelper(this).EnsureHandle();HwndSource.FromHwnd(handle).AddHook(Hook);HotkeyRegistered=Native.RegisterHotKey(handle,71,0x4002,0x20);
  monitor.Interval=TimeSpan.FromSeconds(1);monitor.Tick+=(s,e)=>Monitor();monitor.Start();
- tray=new Forms.NotifyIcon{Visible=true,Text="Fluid Dock · Ctrl + 空格",Icon=System.Drawing.Icon.ExtractAssociatedIcon(typeof(Dock).Assembly.Location)};var tm=new Forms.ContextMenuStrip();tm.Items.Add("搜索应用  Ctrl + 空格",null,(s,e)=>Dispatcher.BeginInvoke(new Action(ToggleSearch)));tm.Items.Add("一键配置",null,(s,e)=>Dispatcher.BeginInvoke(new Action(OpenSetup)));tm.Items.Add("电脑整理",null,(s,e)=>Dispatcher.BeginInvoke(new Action(OpenCare)));tm.Items.Add("退出",null,(s,e)=>Dispatcher.BeginInvoke(new Action(Close)));tray.ContextMenuStrip=tm;tray.DoubleClick+=(s,e)=>Dispatcher.BeginInvoke(new Action(ToggleSearch));
+ tray=new Forms.NotifyIcon{Visible=true,Text="DockBot · Ctrl + 空格",Icon=System.Drawing.Icon.ExtractAssociatedIcon(typeof(Dock).Assembly.Location)};var tm=new Forms.ContextMenuStrip();tm.Items.Add("搜索应用  Ctrl + 空格",null,(s,e)=>Dispatcher.BeginInvoke(new Action(ToggleSearch)));tm.Items.Add("一键配置",null,(s,e)=>Dispatcher.BeginInvoke(new Action(OpenSetup)));tm.Items.Add("电脑整理",null,(s,e)=>Dispatcher.BeginInvoke(new Action(OpenCare)));tm.Items.Add("退出",null,(s,e)=>Dispatcher.BeginInvoke(new Action(Close)));tray.ContextMenuStrip=tm;tray.DoubleClick+=(s,e)=>Dispatcher.BeginInvoke(new Action(ToggleSearch));
  Loaded+=(s,e)=>{Place();Wake();Persist();if(Settings.HideDesktopIcons)DesktopSurface.HideIcons();Dispatcher.BeginInvoke(DispatcherPriority.Background,new Action(()=>{search=new SearchPanel(this);search.Prepare();if(Settings.Widget){widget=new ClockWidget(this);widget.Show();}Prewarm();}));if(args.Contains("--preview")||args.Contains("--verify")){var timer=new DispatcherTimer{Interval=TimeSpan.FromSeconds(3)};timer.Tick+=(a,b)=>{timer.Stop();Verify();};timer.Start();}};
  Closed+=(s,e)=>{closing=true;monitor.Stop();if(rendering)CompositionTarget.Rendering-=Render;Native.UnregisterHotKey(handle,71);Persist();if(search!=null)search.Close();if(widget!=null)widget.Close();glass.Close();if(Settings.HideDesktopIcons)DesktopSurface.Restore();tray.Dispose();};
  SystemParameters.StaticPropertyChanged+=(s,e)=>Dispatcher.BeginInvoke(new Action(()=>{Width=SystemParameters.WorkArea.Width-16;Rebuild();Place();}));
@@ -73,11 +73,11 @@ public partial class Dock:Window {
  if(!hoverEffects){b.Background=Brushes.Transparent;return;}var hover=new SolidColorBrush(Colors.Transparent);b.Background=hover;b.MouseEnter+=(s,e)=>hover.BeginAnimation(SolidColorBrush.ColorProperty,new ColorAnimation(Color.FromArgb(30,255,255,255),TimeSpan.FromMilliseconds(100)));b.MouseLeave+=(s,e)=>hover.BeginAnimation(SolidColorBrush.ColorProperty,new ColorAnimation(Colors.Transparent,TimeSpan.FromMilliseconds(180)));
  }
  void Place(){var a=SystemParameters.WorkArea;Left=a.Left+8;Top=a.Bottom-Height-10;LayoutDock();}
- bool Utility(Entry e){return e.Name=="此电脑"||e.Name=="回收站"||e.Name=="桌面收纳";}
+ bool Utility(Entry e){return e.Name=="此电脑"||e.Name=="回收站"||e.Name=="桌面收纳"||e.Name=="文件";}
  int GroupOrder(string s){int index=Array.IndexOf(Settings.GroupOrder??new[]{"系统","AI","办公","开发","音乐","游戏","常用网站","其他工具"},s);return index<0?8:index;}
  public void Rebuild(){
  var oldTiles=tiles.GroupBy(t=>AppCatalog.Key(t.App)).ToDictionary(g=>g.Key,g=>g.First());foreach(var t in tiles)canvas.Children.Remove(t.Button);tiles.Clear();foreach(var d in dividers)canvas.Children.Remove(d);dividers.Clear();
- var normal=Entries.Where(e=>e.Pinned&&!e.Hidden&&!Utility(e)).ToList();normal.Add(new Entry{Name="添加软件",Target="fluid://add",Group="其他工具"});normal.Add(new Entry{Name="搜索",Target="fluid://search",Group="其他工具"});normal.Add(new Entry{Name="DockBot",Target="fluid://assistant",Group="助手"});var apps=Entries.Where(Utility).OrderBy(e=>e.Name=="此电脑"?0:e.Name=="桌面收纳"?1:2).Concat(normal.OrderBy(e=>GroupOrder(e.Group))).ToList();
+ var normal=Entries.Where(e=>e.Pinned&&!e.Hidden&&!Utility(e)).ToList();UpdateOnboarding(normal.Count==0);if(normal.Count>0){normal.Add(new Entry{Name="添加软件",Target="fluid://add",Group="其他工具"});normal.Add(new Entry{Name="搜索",Target="fluid://search",Group="其他工具"});}normal.Add(new Entry{Name="DockBot",Target="fluid://assistant",Group="助手"});var apps=Entries.Where(Utility).OrderBy(e=>e.Name=="此电脑"?0:e.Name=="桌面收纳"?1:2).Concat(normal.OrderBy(e=>GroupOrder(e.Group))).ToList();
  int capacity=Math.Max(8,(int)((Width/Settings.DockScale-140)/36));if(apps.Count>capacity){var special=apps.Where(a=>a.Target.StartsWith("fluid://")).ToList();apps=apps.Where(a=>!a.Target.StartsWith("fluid://")).Take(capacity-special.Count).Concat(special).ToList();}double cell=Math.Max(24,Math.Min(58,(Width/Settings.DockScale-180)/Math.Max(1,apps.Count)));double x=0;string group="";
  foreach(var e in apps){
  if(group!=""&&e.Group!=group){x+=17;var d=new Border{Width=1,Height=29,Background=B("#35FFFFFF"),IsHitTestVisible=false,RenderTransform=new TranslateTransform()};Canvas.SetLeft(d,0);Canvas.SetTop(d,91);canvas.Children.Add(d);dividers.Add(d);}group=e.Group;
@@ -89,14 +89,14 @@ public partial class Dock:Window {
  b.Click+=(s,a)=>{t.Bounce=-9;Wake();Launch(e);};b.GotKeyboardFocus+=(s,a)=>{t.Target=1.25;Wake();};b.LostKeyboardFocus+=(s,a)=>{t.Target=1;Wake();};
  tiles.Add(t);canvas.Children.Add(b);x+=cell;
  }
-baseWidth=x;LayoutDock();if(search!=null)search.InvalidateCatalog();Wake();
+baseWidth=x;if(plateWidth<=0)plateWidth=baseWidth;LayoutDock();if(search!=null)search.InvalidateCatalog();Wake();
  }
  void LayoutDock(){
  if(tiles.Count==0)return;double cell=tiles[0].Button.Width,total=baseWidth;foreach(var tile in tiles)total+=Math.Max(0,tile.ScaleNow-1)*cell*.72;double left=(Width-total)/2,shift=0;string group="";int divider=0;
  foreach(var t in tiles){double extra=Math.Max(0,t.ScaleNow-1)*cell*.72;t.Center=left+t.Baseline+shift+extra/2;t.Scale.ScaleX=t.Scale.ScaleY=t.ScaleNow;double destination=t.Center-t.Button.Width/2;if(!Double.IsNaN(t.InitialX)){t.OffsetX=t.InitialX-destination;t.InitialX=Double.NaN;}t.Move.X=destination+t.OffsetX;t.Move.Y=hide+t.Lift+t.Bounce;shift+=extra;
  if(group!=""&&t.App.Group!=group&&divider<dividers.Count){var d=dividers[divider++];var move=(TranslateTransform)d.RenderTransform;move.X=t.Center-t.Button.Width/2-9;move.Y=hide;}group=t.App.Group;}
- double plateLeft=(Width-baseWidth)/2-7;rim.Width=baseWidth+14;Canvas.SetLeft(rim,plateLeft);Canvas.SetTop(rim,68+hide);
- double nativeWidth=(baseWidth+14)*Settings.DockScale,nativeLeft=Left+(Width-nativeWidth)/2,nativeTop=Top+Height-(156-68-hide)*Settings.DockScale;glass.Height=78*Settings.DockScale;if(Math.Abs(glass.Width-nativeWidth)>.5){glass.Width=nativeWidth;surfaceWrites++;}if(Math.Abs(glass.Left-nativeLeft)>.25){glass.Left=nativeLeft;surfaceWrites++;}if(Math.Abs(glass.Top-nativeTop)>.25){glass.Top=nativeTop;surfaceWrites++;}glass.Visibility=hide>100?Visibility.Hidden:Visibility.Visible;Canvas.SetLeft(dropBadge,(Width-250)/2);Canvas.SetTop(dropBadge,6);
+ double visibleWidth=plateWidth>0?plateWidth:baseWidth;double plateLeft=(Width-visibleWidth)/2-7;rim.Width=visibleWidth+14;if(onboarding!=null){Canvas.SetLeft(onboarding,(Width-112)/2);Canvas.SetTop(onboarding,20+hide);}Canvas.SetLeft(rim,plateLeft);Canvas.SetTop(rim,68+hide);
+ double nativeWidth=(visibleWidth+14)*Settings.DockScale,nativeLeft=Left+(Width-nativeWidth)/2,nativeTop=Top+Height-(156-68-hide)*Settings.DockScale;glass.Height=78*Settings.DockScale;if(Math.Abs(glass.Width-nativeWidth)>.5){glass.Width=nativeWidth;surfaceWrites++;}if(Math.Abs(glass.Left-nativeLeft)>.25){glass.Left=nativeLeft;surfaceWrites++;}if(Math.Abs(glass.Top-nativeTop)>.25){glass.Top=nativeTop;surfaceWrites++;}glass.Visibility=hide>100?Visibility.Hidden:Visibility.Visible;Canvas.SetLeft(dropBadge,(Width-250)/2);Canvas.SetTop(dropBadge,6);
  }
  void Pointer(Point p){
  if(dragIndex>=0)return;botTarget=0;double origin=(Width-baseWidth)/2;Tile nearest=null;double nd=9999;
@@ -110,7 +110,7 @@ baseWidth=x;LayoutDock();if(search!=null)search.InvalidateCatalog();Wake();
  if(Settings.ReducedMotion){t.ScaleNow=t.Target>1?1.08:t.Target;t.Lift=0;t.ScaleV=0;t.Bounce=0;}
  else for(int i=0;i<4;i++){double d=dt/4;t.ScaleV+=(680*(t.Target-t.ScaleNow)-43*t.ScaleV)*d;t.ScaleNow+=t.ScaleV*d;t.LiftV+=(600*(liftTarget-t.Lift)-43*t.LiftV)*d;t.Lift+=t.LiftV*d;}
  for(int i=0;i<4;i++){t.OffsetV+=(-600*t.OffsetX-43*t.OffsetV)*dt/4;t.OffsetX+=t.OffsetV*dt/4;}if(Math.Abs(t.OffsetX)>.08||Math.Abs(t.OffsetV)>.1)moving=true;t.Bounce*=Math.Exp(-dt*15);if(!Settings.ReducedMotion&&(Math.Abs(t.Target-t.ScaleNow)>.001||Math.Abs(t.ScaleV)>.005||Math.Abs(liftTarget-t.Lift)>.04||Math.Abs(t.Bounce)>.05))moving=true;}
- if(AnimateBot(dt))moving=true;for(int i=0;i<4;i++){hideV+=(360*(hideTarget-hide)-38*hideV)*dt/4;hide+=hideV*dt/4;}if(Math.Abs(hideTarget-hide)>.1||Math.Abs(hideV)>.1)moving=true;LayoutDock();
+ if(AnimateBot(dt))moving=true;if(StepPlate(dt))moving=true;for(int i=0;i<4;i++){hideV+=(360*(hideTarget-hide)-38*hideV)*dt/4;hide+=hideV*dt/4;}if(Math.Abs(hideTarget-hide)>.1||Math.Abs(hideV)>.1)moving=true;LayoutDock();
  if(measureHover)hoverFrameCosts.Add(renderCostWatch.Elapsed.TotalMilliseconds);if(!moving){CompositionTarget.Rendering-=Render;rendering=false;}
  }
  IntPtr Hook(IntPtr hwnd,int msg,IntPtr w,IntPtr l,ref bool handled){if(msg==0x312&&w.ToInt32()==71){ToggleSearch();handled=true;}return IntPtr.Zero;}
@@ -153,7 +153,7 @@ baseWidth=x;LayoutDock();if(search!=null)search.InvalidateCatalog();Wake();
  public void Launch(Entry e){
  if(e.Target=="fluid://search"){OpenManager("library");return;}if(e.Target=="fluid://assistant"){OpenManager("assistant");return;}if(e.Target=="fluid://add"){OpenManager("add");return;}if(Settings.TrackUsage){GetUse(e).Clicks++;dirty=true;}if(search!=null)search.Dismiss();DispatchLaunch(e);
  }
- public void Toast(string text){tray.BalloonTipTitle="Fluid Dock";tray.BalloonTipText=text;tray.ShowBalloonTip(2500);}
+ public void Toast(string text){tray.BalloonTipTitle="DockBot";tray.BalloonTipText=text;tray.ShowBalloonTip(2500);}
  static void MenuAction(ContextMenu m,string title,Action action){var item=new MenuItem{Header=title};item.Click+=(s,e)=>action();m.Items.Add(item);}
  ContextMenu Menu(){
  var m=new ContextMenu();MenuAction(m,"搜索应用    Ctrl + 空格",ToggleSearch);MenuAction(m,"添加软件…",()=>OpenManager("add"));MenuAction(m,"一键配置…",OpenSetup);MenuAction(m,"电脑整理…",OpenCare);MenuAction(m,"小助手",()=>OpenManager("assistant"));MenuAction(m,"移除入口…",()=>OpenManager("remove"));MenuAction(m,"添加搜索目录…",ChooseSearchRoot);MenuAction(m,"按使用习惯智能整理",()=>SortSmart(true));MenuAction(m,"使用统计",()=>OpenCategory("统计"));MenuAction(m,"管理隐藏应用",()=>OpenCategory("隐藏"));
@@ -213,7 +213,7 @@ public partial class SearchPanel:GlassWindow {
  Dictionary<Entry,ListBoxItem> rowCache=new Dictionary<Entry,ListBoxItem>();
  Dock dock;TextBox input;ListBox results;TextBlock empty,title,foot;Border surface;StackPanel tabs;bool stale=true,showing;List<Entry> current=new List<Entry>();double morph,morphV,morphTarget,morphLast;bool morphTick;Stopwatch morphClock=Stopwatch.StartNew();ScaleTransform morphScale=new ScaleTransform(1,1);TranslateTransform morphMove=new TranslateTransform();public string Category="全部";public bool Hold;
  public SearchPanel(Dock owner){
- dock=owner;Owner=owner;Title="Fluid Dock · 搜索";Width=720;Height=570;
+ dock=owner;Owner=owner;Title="DockBot · 搜索";Width=720;Height=570;
  surface=new Border{CornerRadius=new CornerRadius(26),Background=Dock.B("#48141C28"),BorderBrush=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(24,22,24,16)};Content=surface;
  var root=new DockPanel();surface.Child=root;var top=new DockPanel{Margin=new Thickness(1,0,0,18)};DockPanel.SetDock(top,System.Windows.Controls.Dock.Top);root.Children.Add(top);
  var badge=Dock.Text(dock.ShortcutLabel.ToUpperInvariant(),10,"#A6B6C9");DockPanel.SetDock(badge,System.Windows.Controls.Dock.Right);top.Children.Add(badge);title=Dock.Text("随时，触手可及。",18,"#F1F4FA");title.FontWeight=FontWeights.SemiBold;top.Children.Add(title);
@@ -241,7 +241,7 @@ public partial class SearchPanel:GlassWindow {
  public void InvalidateCatalog(){rowCache.Clear();stale=true;if(IsVisible)Refresh();}
  public void Reveal(){
  var sw=Stopwatch.StartNew();var a=SystemParameters.WorkArea;Left=a.Left+(a.Width-Width)/2;Top=a.Top+Math.Max(60,(a.Height-Height)*.34);if(input.Text.Length>0)input.Text="";else if(stale||Category!="全部")Refresh();
- showing=true;Show();Activate();input.Focus();
+ showing=true;Show();if(!dock.RecordingDemo){Activate();input.Focus();}
  AnimatePanel(true);
  dock.LastSearchMs=sw.Elapsed.TotalMilliseconds;
  }
@@ -274,8 +274,8 @@ public partial class SearchPanel:GlassWindow {
 }
 public class ClockWidget:GlassWindow {
  Dock dock;TextBlock clock,date;DispatcherTimer timer=new DispatcherTimer();
- public ClockWidget(Dock owner){dock=owner;Title="Fluid · 桌面时钟";Width=252;Height=158;Topmost=false;var area=SystemParameters.WorkArea;Left=area.Right-Width-34;Top=area.Top+38;
- var frame=new Border{CornerRadius=new CornerRadius(24),BorderThickness=new Thickness(0),BorderBrush=Brushes.Transparent,Background=Dock.B("#35141C28"),Padding=new Thickness(22,18,22,16)};Content=frame;var stack=new StackPanel();frame.Child=stack;stack.Children.Add(Dock.Text("F L U I D    /    TODAY",9,"#A2B8CF"));clock=Dock.Text("",43,"#F3F6FB");clock.FontWeight=FontWeights.Light;clock.Margin=new Thickness(0,4,0,0);stack.Children.Add(clock);date=Dock.Text("",11,"#C0CBDA");stack.Children.Add(date);var summary=Dock.Text("Ctrl + 空格 · 随时搜索",10,"#91ABC6");summary.Margin=new Thickness(0,12,0,0);stack.Children.Add(summary);
+ public ClockWidget(Dock owner){dock=owner;Title="DockBot · 桌面时钟";Width=252;Height=158;Topmost=false;var area=SystemParameters.WorkArea;Left=area.Right-Width-34;Top=area.Top+38;
+ var frame=new Border{CornerRadius=new CornerRadius(24),BorderThickness=new Thickness(0),BorderBrush=Brushes.Transparent,Background=Dock.B("#35141C28"),Padding=new Thickness(22,18,22,16)};Content=frame;var stack=new StackPanel();frame.Child=stack;stack.Children.Add(Dock.Text("D O C K B O T    /    TODAY",9,"#A2B8CF"));clock=Dock.Text("",43,"#F3F6FB");clock.FontWeight=FontWeights.Light;clock.Margin=new Thickness(0,4,0,0);stack.Children.Add(clock);date=Dock.Text("",11,"#C0CBDA");stack.Children.Add(date);var summary=Dock.Text("Ctrl + 空格 · 随时搜索",10,"#91ABC6");summary.Margin=new Thickness(0,12,0,0);stack.Children.Add(summary);
  MouseLeftButtonDown+=(s,e)=>{if(e.ClickCount==2)dock.ToggleSearch();else DragMove();};MouseRightButtonUp+=(s,e)=>dock.OpenCategory("统计");timer.Interval=TimeSpan.FromSeconds(15);timer.Tick+=(s,e)=>Update();timer.Start();Update();Closed+=(s,e)=>timer.Stop();}
  void Update(){clock.Text=DateTime.Now.ToString("HH:mm");date.Text=DateTime.Now.ToString("M 月 d 日  dddd",System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));}
  public void SetCovered(bool covered){if(covered&&IsVisible)Hide();else if(!covered&&!IsVisible)Show();}
@@ -296,15 +296,3 @@ public static class DesktopSurface {
  }
  public static void Restore(){if(desktopList==IntPtr.Zero){var prog=FindWindow("Progman",null);var view=FindWindowEx(prog,IntPtr.Zero,"SHELLDLL_DefView",null);if(view==IntPtr.Zero)EnumWindows((h,p)=>{view=FindWindowEx(h,IntPtr.Zero,"SHELLDLL_DefView",null);return view==IntPtr.Zero;},IntPtr.Zero);if(view!=IntPtr.Zero)desktopList=FindWindowEx(view,IntPtr.Zero,"SysListView32",null);}if(desktopList!=IntPtr.Zero)ShowWindow(desktopList,5);}
 }
-
-
-
-
-
-
-
-
-
-
-
-

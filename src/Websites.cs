@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text.RegularExpressions;
 public static class Websites {
     public static Entry Resolve(string query){

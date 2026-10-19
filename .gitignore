@@ -12,3 +12,9 @@ local-data/
 test-results/
 __pycache__/
 *.tmp
+node_modules/
+/media/
+artifacts/
+film/public/fonts/
+film/public/*.wav
+film/public/native-demo.mp4

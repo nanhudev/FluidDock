@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -38,7 +38,7 @@ public static class ComputerSearch {
 public partial class SearchPanel {
     List<Entry> fileResults=new List<Entry>();string fileQuery="";int fileGeneration;DispatcherTimer fileDebounce;bool fileIndexed;
     void RequestFiles(string query){
-        if(Mode!="library"||!(Category=="全部"||Category=="文件"))return;
+        if(dock.RecordingDemo)return;if(Mode!="library"||!(Category=="全部"||Category=="文件"))return;
         if(query==fileQuery)return;fileQuery=query;fileResults.Clear();int generation=++fileGeneration;
         if(fileDebounce!=null)fileDebounce.Stop();if(query.Length<2)return;
         fileDebounce=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(160)};

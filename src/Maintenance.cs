@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -64,18 +64,18 @@ public static class CareScan {
         return RecycleFiles.Send(item.Path)&&!File.Exists(item.Path)?"已移入回收站":"未清理（系统取消或文件占用）";
     }
 }
-public sealed class CareWindow:Window {
+public sealed partial class CareWindow:GlassWindow {
     public bool HasSelection {get{return selections.Any(p=>p.Item1.IsChecked==true);}}
-    readonly Dock dock;readonly StackPanel rows=new StackPanel();readonly TextBlock status;readonly Button execute;readonly List<Tuple<CheckBox,CareItem>> selections=new List<Tuple<CheckBox,CareItem>>();string root,mode;bool stopped,busy;
+    readonly BusyIndicator spinner=new BusyIndicator();readonly Dock dock;readonly StackPanel rows=new StackPanel();readonly TextBlock status;readonly Button execute;readonly List<Tuple<CheckBox,CareItem>> selections=new List<Tuple<CheckBox,CareItem>>();string root,mode;bool stopped,busy;
     public CareWindow(Dock owner){
         dock=owner;Title="电脑整理";Width=740;Height=640;WindowStartupLocation=WindowStartupLocation.CenterScreen;Background=Dock.B(owner.Settings.Appearance=="light"?"#E5ECF2":"#202630");Foreground=owner.Settings.Appearance=="light"?Dock.B("#253247"):Brushes.White;FontFamily=new FontFamily("Microsoft YaHei UI");ResizeMode=ResizeMode.CanResize;Closed+=(s,e)=>stopped=true;
         var grid=new Grid{Margin=new Thickness(24)};Content=grid;grid.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});grid.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});grid.RowDefinitions.Add(new RowDefinition());grid.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
         var head=new StackPanel();head.Children.Add(Dock.Text("电脑整理",22,"#F1F5FA"));var actions=new WrapPanel{Margin=new Thickness(0,16,0,12)};head.Children.Add(actions);grid.Children.Add(head);
         AddButton(actions,"桌面归档",()=>Scan("desktop",Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)));AddButton(actions,"用户临时文件",()=>Scan("temp",Path.GetTempPath()));AddButton(actions,"大文件…",PickLarge);AddButton(actions,"已安装应用",ShowApps);
         AddButton(actions,"Windows 存储清理",()=>{if(MessageBox.Show(this,"打开 Windows 存储设置。系统缓存、更新文件等由你在系统中勾选确认。","系统存储",MessageBoxButton.OKCancel)==MessageBoxResult.OK)Process.Start(new ProcessStartInfo("ms-settings:storagesense"){UseShellExecute=true});});
-        status=Dock.Text("选择扫描范围。扫描不会修改文件。",12,"#AFC1D6");status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(0,0,0,12);Grid.SetRow(status,1);grid.Children.Add(status);
+        status=Dock.Text("选择扫描范围。扫描不会修改文件。",12,"#AFC1D6");status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(0,0,0,12);var progress=new DockPanel();progress.Children.Add(spinner);progress.Children.Add(status);Grid.SetRow(progress,1);grid.Children.Add(progress);
         var scroll=new ScrollViewer{Content=rows,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};Grid.SetRow(scroll,2);grid.Children.Add(scroll);
-        execute=new Button{Content="处理勾选项",Padding=new Thickness(20,12,20,12),HorizontalAlignment=HorizontalAlignment.Right,IsEnabled=false,Margin=new Thickness(0,14,0,0)};Dock.ButtonStyle(execute);execute.Click+=(s,e)=>Confirm();Grid.SetRow(execute,3);grid.Children.Add(execute);
+        execute=new Button{Content="处理勾选项",Padding=new Thickness(20,12,20,12),HorizontalAlignment=HorizontalAlignment.Right,IsEnabled=false,Margin=new Thickness(0,14,0,0)};Dock.ButtonStyle(execute);execute.Click+=(s,e)=>Confirm();Grid.SetRow(execute,3);grid.Children.Add(execute);PanelChrome.Attach(this,grid,owner);
     }
     void AddButton(Panel p,string text,Action action){var b=new Button{Content=text,Padding=new Thickness(12,9,12,9),Margin=new Thickness(0,0,8,8)};Dock.ButtonStyle(b);b.Click+=(s,e)=>{if(!busy)action();};p.Children.Add(b);}
     void ShowApps(){rows.Children.Clear();selections.Clear();UpdateCount();status.Text="可通过 Windows 卸载的应用，按登记大小排序。请自行判断是否仍需要；未记录使用不代表没用。";foreach(var app in InstalledApps.List()){
@@ -85,9 +85,9 @@ public sealed class CareWindow:Window {
     void PickLarge(){using(var picker=new System.Windows.Forms.FolderBrowserDialog{Description="选择扫描大文件的本地文件夹"})if(picker.ShowDialog()==System.Windows.Forms.DialogResult.OK)Scan("large",picker.SelectedPath);}
     void Scan(string kind,string folder){
         try{var drive=new DriveInfo(Path.GetPathRoot(folder));if(drive.DriveType!=DriveType.Fixed){status.Text="请选择本地固定磁盘。";return;}if(kind=="large"&&CareScan.Protected(folder)){status.Text="请选择个人文件夹，系统和应用目录不参与清理。";return;}}catch{status.Text="无法访问此位置。";return;}
-        mode=kind;root=folder;busy=true;execute.IsEnabled=false;rows.Children.Clear();selections.Clear();status.Text="正在扫描："+folder;
-        ThreadPool.QueueUserWorkItem(s=>{CareReport report;try{report=CareScan.Scan(kind,folder,()=>stopped);}catch(Exception ex){if(!stopped)Dispatcher.BeginInvoke(new Action(()=>{busy=false;status.Text=ex.Message;}));return;}if(stopped)return;Dispatcher.BeginInvoke(new Action(()=>{
-            busy=false;status.Text=(kind=="desktop"?"只移动所选文件，文件夹与程序保留。":kind=="temp"?"仅用户临时目录，超过 7 天的临时文件。": "≥250 MB，大小不代表可删除。请核对内容。")+"\n"+report.Items.Count+" 项 · "+CareScan.Size(report.Items.Sum(i=>i.Bytes))+" · 跳过 "+report.Skipped+" 个无法访问或受保护位置"+(report.Limited?" · 已达扫描上限，可选择更小的文件夹":"")+"\n移入回收站后不会立即释放空间；清空回收站需自行操作。";
+        mode=kind;root=folder;busy=true;spinner.IsRunning=true;execute.IsEnabled=false;rows.Children.Clear();selections.Clear();status.Text="正在扫描："+folder;
+        ThreadPool.QueueUserWorkItem(s=>{CareReport report;try{report=CareScan.Scan(kind,folder,()=>stopped);}catch(Exception ex){if(!stopped)Dispatcher.BeginInvoke(new Action(()=>{busy=false;spinner.IsRunning=false;status.Text=ex.Message;}));return;}if(stopped)return;Dispatcher.BeginInvoke(new Action(()=>{
+            busy=false;spinner.IsRunning=false;status.Text=(kind=="desktop"?"只移动所选文件，文件夹与程序保留。":kind=="temp"?"仅用户临时目录，超过 7 天的临时文件。": "≥250 MB，大小不代表可删除。请核对内容。")+"\n"+report.Items.Count+" 项 · "+CareScan.Size(report.Items.Sum(i=>i.Bytes))+" · 跳过 "+report.Skipped+" 个无法访问或受保护位置"+(report.Limited?" · 已达扫描上限，可选择更小的文件夹":"")+"\n移入回收站后不会立即释放空间；清空回收站需自行操作。";
             foreach(var item in report.Items){var cb=new CheckBox{Content=new TextBlock{Text=item.Label,TextWrapping=TextWrapping.Wrap,Foreground=Foreground,FontSize=12},Margin=new Thickness(4,10,4,10),IsChecked=false};cb.Checked+=(a,b)=>UpdateCount();cb.Unchecked+=(a,b)=>UpdateCount();selections.Add(Tuple.Create(cb,item));rows.Children.Add(cb);}UpdateCount();
         }));});
     }
@@ -103,5 +103,3 @@ public sealed class CareWindow:Window {
     }
 }
 public partial class Dock {public void OpenCare(){new CareWindow(this).Show();}}
-
-

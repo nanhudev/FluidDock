@@ -1,7 +1,7 @@
-using System.Reflection;
-[assembly:AssemblyTitle("FluidDock")]
+﻿using System.Reflection;
+[assembly:AssemblyTitle("DockBot")]
 [assembly:AssemblyDescription("A fluid Windows dock with a local intent assistant")]
-[assembly:AssemblyCompany("FluidDock contributors")]
-[assembly:AssemblyProduct("FluidDock")]
-[assembly:AssemblyVersion("0.1.0.0")]
-[assembly:AssemblyFileVersion("0.1.0.0")]
+[assembly:AssemblyCompany("DockBot contributors")]
+[assembly:AssemblyProduct("DockBot")]
+[assembly:AssemblyVersion("0.1.1.0")]
+[assembly:AssemblyFileVersion("0.1.1.0")]

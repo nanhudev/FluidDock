@@ -75,7 +75,7 @@ public static class AppCatalog {
         string win=Environment.GetFolderPath(Environment.SpecialFolder.Windows),desktop=Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
         return new List<Entry>{
             new Entry{Name="此电脑",Target=Path.Combine(win,"explorer.exe"),Arguments="shell:MyComputerFolder",WorkDir=win,Icon=Path.Combine(win,"System32","shell32.dll")+",15",Group="系统",Pinned=true},
-            new Entry{Name="桌面收纳",Target=Path.Combine(win,"explorer.exe"),Arguments="\""+desktop+"\"",WorkDir=win,Icon=Path.Combine(win,"System32","shell32.dll")+",4",Group="系统",Pinned=true},
+            new Entry{Name="文件",Target=Path.Combine(win,"explorer.exe"),Arguments="\""+desktop+"\"",WorkDir=win,Icon=Path.Combine(win,"System32","shell32.dll")+",4",Group="系统",Pinned=true},
             new Entry{Name="回收站",Target=Path.Combine(win,"explorer.exe"),Arguments="shell:RecycleBinFolder",WorkDir=win,Icon=Path.Combine(win,"System32","imageres.dll")+",-55",Group="系统",Pinned=true}
         };
     }

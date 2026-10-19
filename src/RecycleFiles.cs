@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 
 // Windows 10+: require recycling rather than accepting a permanent-delete fallback.
