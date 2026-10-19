@@ -1,0 +1,18 @@
+# DockBot
+
+> Free, open-source native Windows dock and local intent assistant.
+
+DockBot runs on Windows 10 and Windows 11 with .NET Framework 4.8. Its approximately 17 KB local intent model works with application matching and rules to manage a Windows desktop. It is not a general-purpose language model.
+
+Features: glass dock, application drag and drop, categories, natural-language application management, saved workspaces, Ctrl + Space search, and desktop cleanup with confirmation. Local intent recognition requires no paid model API. Optional usage records and configuration are stored locally.
+
+License: MIT. Author: nanhudev. Current builds are preview releases.
+
+## Official sources
+
+- [Website](https://dockbot.bubbleapp.cn/)
+- [Source and README](https://github.com/nanhudev/dockbot)
+- [Downloads](https://github.com/nanhudev/dockbot/releases/latest)
+- [Supported commands](https://github.com/nanhudev/dockbot/blob/main/docs/intents.md)
+- [Assistant implementation](https://github.com/nanhudev/dockbot/blob/main/docs/assistant-design.md)
+- [Report an issue](https://github.com/nanhudev/dockbot/issues)

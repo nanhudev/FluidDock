@@ -3,7 +3,9 @@
 
 # dockbot
 
-Windows 桌面助手 · 圆角玻璃 Dock · 17 KB 本地意图模型
+免费开源的 Windows 桌面 Dock 与本地 AI 助手 · 圆角玻璃 · 约 17 KB 意图模型
+
+Free, open-source Windows dock with a tiny offline intent assistant, workspaces and global search.
 
 [下载 EXE](https://github.com/nanhudev/dockbot/releases/download/v0.2.0-preview.2/DockBot.exe) · [使用指令](docs/intents.md)
 </div>
@@ -81,6 +83,7 @@ models/    意图模型与训练数据
 tools/     构建打包与模型训练工具
 assets/    产品图标
 docs/      使用指令、设计文档与截图
+website/   官网页面与搜索元数据
 ```
 
 ## License
