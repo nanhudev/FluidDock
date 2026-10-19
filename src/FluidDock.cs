@@ -162,7 +162,7 @@ baseWidth=x;if(plateWidth<=0)plateWidth=baseWidth;LayoutDock();if(search!=null)s
  ContextMenu Menu(){
  var m=new ContextMenu();MenuAction(m,"搜索应用    Ctrl + 空格",ToggleSearch);MenuAction(m,"添加软件…",()=>OpenManager("add"));MenuAction(m,"一键配置…",OpenSetup);MenuAction(m,"电脑整理…",OpenCare);MenuAction(m,"小助手",()=>OpenManager("assistant"));MenuAction(m,"移除入口…",()=>OpenManager("remove"));MenuAction(m,"添加搜索目录…",ChooseSearchRoot);MenuAction(m,"按使用习惯智能整理",()=>SortSmart(true));MenuAction(m,"使用统计",()=>OpenCategory("统计"));MenuAction(m,"管理隐藏应用",()=>OpenCategory("隐藏"));
  var hideItem=new MenuItem{Header="自动收起",IsCheckable=true,IsChecked=Settings.AutoHide};hideItem.Click+=(s,e)=>{Settings.AutoHide=hideItem.IsChecked;Persist();};m.Items.Add(hideItem);
- var reduce=new MenuItem{Header="减少动态效果",IsCheckable=true,IsChecked=Settings.ReducedMotion};reduce.Click+=(s,e)=>{Settings.ReducedMotion=reduce.IsChecked;Persist();Wake();};m.Items.Add(reduce);MenuAction(m,"显示桌面文件",DesktopSurface.Restore);MenuAction(m,"隐藏桌面文件",DesktopSurface.HideIcons);MenuAction(m,"退出 Dock",Close);return m;
+ var reduce=new MenuItem{Header="减少动态效果",IsCheckable=true,IsChecked=Settings.ReducedMotion};reduce.Click+=(s,e)=>{Settings.ReducedMotion=reduce.IsChecked;ThemeState.ReducedMotion=Settings.ReducedMotion;Persist();Wake();};m.Items.Add(reduce);MenuAction(m,"显示桌面文件",DesktopSurface.Restore);MenuAction(m,"隐藏桌面文件",DesktopSurface.HideIcons);MenuAction(m,"退出 Dock",Close);return m;
  }
  public ContextMenu EntryMenu(Entry e){
  var m=new ContextMenu();MenuAction(m,"打开 "+e.Name,()=>Launch(e));if(!Utility(e)){

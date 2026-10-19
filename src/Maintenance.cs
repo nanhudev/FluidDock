@@ -91,7 +91,7 @@ public sealed partial class CareWindow:GlassWindow {
             UpdateCount();
         }));});
     }
-    void AddScannedItem(CareItem item){var cb=new CheckBox{Content=new TextBlock{Text=item.Label,TextWrapping=TextWrapping.Wrap,Foreground=Foreground,FontSize=12},Margin=new Thickness(4,10,4,10),IsChecked=false};cb.Checked+=(a,b)=>UpdateCount();cb.Unchecked+=(a,b)=>UpdateCount();selections.Add(Tuple.Create(cb,item));rows.Children.Add(cb);dock.RevealItem(cb);}
+    void AddScannedItem(CareItem item){var cb=new CheckBox{Content=new TextBlock{Text=item.Label,TextWrapping=TextWrapping.Wrap,Foreground=Foreground,FontSize=12},Margin=new Thickness(4,10,4,10),IsChecked=false};cb.Checked+=(a,b)=>UpdateCount();cb.Unchecked+=(a,b)=>UpdateCount();selections.Add(Tuple.Create(cb,item));rows.Children.Add(cb);dock.RevealItem(cb,selections.Count-1);}
     void UpdateCount(){int n=selections.Count(p=>p.Item1.IsChecked==true);execute.Content="处理勾选项（"+n+"）";execute.IsEnabled=!busy&&n>0;}
     void Confirm(){
         var chosen=selections.Where(p=>p.Item1.IsChecked==true).Select(p=>p.Item2).ToArray();if(chosen.Length==0||busy)return;

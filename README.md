@@ -130,10 +130,15 @@
 
 ## 安装与使用
 
-1. 从 [Releases](https://github.com/nanhudev/dockbot/releases) 下载 Windows 压缩包并解压。
-2. 双击 `DockBot.exe` 直接使用，或运行 `Install.ps1` 安装到当前用户目录。
-3. 点击一键配置，选出自己的常用软件。
-4. 用拖放、快捷键和 DockBot 继续调整。
+直接下载 [DockBot.exe](https://github.com/nanhudev/dockbot/releases/download/v0.1.1-preview.1/DockBot.exe)，双击即可使用。需要完整说明与资源时，下载 Release 中的 ZIP。
+
+也可以在 PowerShell 中执行一行，自动下载、校验、安装并启动：
+
+```powershell
+irm https://raw.githubusercontent.com/nanhudev/dockbot/main/Install-Online.ps1 | iex
+```
+
+首次打开只有系统入口。点击一键配置，选择应用，再通过拖放、搜索或 DockBot 调整；读取使用记录需要单独勾选。安装会创建开始菜单入口，个人设置会保留。
 
 支持 Windows 10 / 11 与 .NET Framework 4.8，无需管理员权限、Python、GPU 或额外模型服务。当前为预览版本。
 
@@ -150,10 +155,11 @@ DockBot 使用软件目录、别名规则和约 **17 KB** 的字符 n-gram 意�
 ## 构建与演示素材
 
 ```powershell
-.\build.ps1 -Test
-.\tools\package.ps1 -Version 0.1.1-preview.1
+npm run build
+npm test
+npm run package
 ```
 
-使用系统自带的 .NET Framework C# 编译器。可选运行 `python tools/train_intent.py` 重新训练模型。宣传片使用原生 WPF 演示录制与 Remotion 剪辑，原创配乐和制作说明见 [film/README.md](film/README.md)。
+使用系统自带的 .NET Framework C# 编译器。可选运行 `python tools/train_intent.py` 重新训练模型。70 秒宣传片使用高清 WPF 演示录制、Remotion 动画设计与 FFmpeg 合成，原创配乐和制作说明见 [film/README.md](film/README.md)。
 
 个人入口、绝对路径、使用记录、字体文件和软件图标缓存不提交到仓库。第三方软件标识归各自权利人所有。MIT License。

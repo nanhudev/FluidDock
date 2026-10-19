@@ -34,5 +34,5 @@ public static class FluidMotion {
     }
 }
 public partial class Dock {
-    public void RevealItem(FrameworkElement element,int index=0){if(Settings.ReducedMotion)return;if(RecordingDemo)DemoReveal(element,index*3);else FluidMotion.Reveal(element,Math.Min(index,12)*.028);}
+    public void RevealItem(FrameworkElement element,int index=0){if(Settings.ReducedMotion||index>23)return;if(RecordingDemo)DemoReveal(element,index*3);else FluidMotion.Reveal(element,Math.Min(index,12)*.028);}
 }

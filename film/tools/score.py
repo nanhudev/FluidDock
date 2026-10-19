@@ -52,6 +52,12 @@ for hit in [0,2,6,13,17,20,24,27,30,32,35,38,41.5,44,49,52,55,59.5,62,66,68]:
     put(noise*ramp*.025,max(0,hit-.17),.5,-.2)
     t=clock(.15);put(np.sin(2*np.pi*(95*t-22*t*t))*np.exp(-t*34),hit,.14)
 
+# Quiet landing cues follow the native actor's contact frames.
+for contact in [19.42,22.62,29.42,37.42,40.62,61.92]:
+    t=clock(.095)
+    pop=(np.sin(2*np.pi*(780*t-1800*t*t))*.48+np.sin(2*np.pi*132*t)*.7)*np.exp(-t*54)
+    put(pop,contact,.075)
+
 t=np.arange(len(audio))/RATE
 fade=np.minimum(1,t/.08)*np.minimum(1,np.maximum(0,(SECONDS-t)/1.2))
 audio=np.tanh(audio*1.8)*fade[:,None]
