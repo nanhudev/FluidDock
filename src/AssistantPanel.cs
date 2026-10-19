@@ -24,7 +24,7 @@ public partial class SearchPanel {
         var heading=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,8)};heading.Children.Add(new BuddyFace());stack.Children.Add(heading);
         assistantText=Dock.Text("试试添加软件、调整顺序、改变风格或大小。",14,"#D2DDEB");assistantText.TextWrapping=TextWrapping.Wrap;assistantText.LineHeight=25;assistantText.Margin=new Thickness(0,10,0,18);stack.Children.Add(assistantText);
         apply=new Button{Content="应用这个操作",Padding=new Thickness(18,11,18,11),HorizontalAlignment=HorizontalAlignment.Left,IsEnabled=false};Dock.ButtonStyle(apply,false);FluidMotion.Press(apply);apply.Background=Dock.B("#ADDCD5");apply.Foreground=Dock.B("#203638");apply.Click+=(s,e)=>RunAssistant();stack.Children.Add(apply);
-        var chips=new WrapPanel{Margin=new Thickness(0,22,0,0)};foreach(string sample in new[]{"一键配置","清理电脑","图标小一点","撤销"}){string text=sample;var b=new Button{Content=sample,Padding=new Thickness(10,7,10,7),Margin=new Thickness(0,0,8,8),FontSize=11};Dock.ButtonStyle(b);b.Click+=(s,e)=>{input.Text=text;input.Focus();};chips.Children.Add(b);}stack.Children.Add(chips);body.Children.Add(assistantRoot);
+        var chips=new WrapPanel{Margin=new Thickness(0,22,0,0)};foreach(string sample in new[]{"工作空间","我要开始开发了","清理电脑","撤销"}){string text=sample;var b=new Button{Content=sample,Padding=new Thickness(10,7,10,7),Margin=new Thickness(0,0,8,8),FontSize=11};Dock.ButtonStyle(b);b.Click+=(s,e)=>{input.Text=text;input.Focus();};chips.Children.Add(b);}stack.Children.Add(chips);body.Children.Add(assistantRoot);
         var assistant=new Button{Content="✦ 助手",Padding=new Thickness(9,7,9,7),FontSize=11};Dock.ButtonStyle(assistant);DockPanel.SetDock(assistant,System.Windows.Controls.Dock.Right);bottom.Children.Insert(0,assistant);assistant.Click+=(s,e)=>SetMode("assistant");
         var remove=new Button{Content="− 管理",Padding=new Thickness(9,7,9,7),FontSize=11};Dock.ButtonStyle(remove);DockPanel.SetDock(remove,System.Windows.Controls.Dock.Right);bottom.Children.Insert(0,remove);remove.Click+=(s,e)=>SetMode("remove");
         var file=new Button{Content="选择文件…",Padding=new Thickness(9,7,9,7),FontSize=11};Dock.ButtonStyle(file);DockPanel.SetDock(file,System.Windows.Controls.Dock.Right);bottom.Children.Insert(0,file);file.Click+=(s,e)=>dock.Pick();
@@ -46,6 +46,25 @@ public partial class SearchPanel {
     }
     static string Describe(DockPlan p){
         switch(p.Intent){
+            case "power":return SystemIntents.PowerNames.ContainsKey(p.SystemAction)?SystemIntents.PowerNames[p.SystemAction]+" · 确认后执行":"电源";
+            case "app_restart":return "重启 "+p.AppName+" · 正常退出后重新打开";
+            case "app_focus":return "切换到 "+p.AppName;
+            case "app_minimize":return "最小化 "+p.AppName;
+            case "app_maximize":return "最大化 "+p.AppName;
+            case "system_settings":case "system_folder":return "打开 "+p.AppName;
+            case "workspace_list":return "保存、切换和管理工作空间";
+            case "workspace_switch":return "切换到“"+p.WorkspaceName+"” · 保留正在运行的应用";
+            case "workspace_save":return "把当前布局保存为“"+p.WorkspaceName+"”";
+            case "workspace_create":return "创建空工作空间“"+p.WorkspaceName+"”";
+            case "workspace_delete":return "删除工作空间“"+p.WorkspaceName+"” · 保留软件";
+            case "workspace_rename":return p.WorkspaceName+" → "+p.NewName;
+            case "workspace_open":return "打开“"+p.WorkspaceName+"”中的应用";
+            case "workspace_add":return p.AppName+" → "+p.WorkspaceName+"工作空间";
+            case "rename":return p.AppName+" → "+p.NewName;
+            case "hide":return "隐藏入口 · "+p.AppName;
+            case "show":return "恢复入口 · "+p.AppName;
+            case "locate":return "显示“"+p.AppName+"”的文件位置";
+            case "usage":return "查看本机使用统计";
             case "batch":return String.Join("、",p.Steps.Select(s=>s.AppName).Distinct())+(p.Group!=""?" → "+p.Group:" · 加入 Dock");
             case "care":return "桌面归档 · 临时文件 · 大文件";
             case "configure":return "选择常用软件，加入 Dock。";

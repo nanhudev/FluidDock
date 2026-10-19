@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -19,7 +19,7 @@ public partial class Dock {
             else if(phase==6){Capture(search,"assistant-preview.png");search.Dismiss();Execute(new DockPlan{Intent="remove",AppName=installed.Last().Name});checks["removeFlow"]=!Entries.First(a=>a.Name==installed.Last().Name).Pinned;}
             else if(phase==7){Execute(new DockPlan{Intent="undo"});checks["undoRemove"]=Entries.First(a=>a.Name==installed.Last().Name).Pinned;}
             else if(phase==8){Capture(this,"dock-preview.png");var setup=new SetupWindow(this);setup.Show();checks["usageConsentDefaultOff"]=!setup.UsageConsent;Capture(setup,"setup-preview.png");setup.Close();}
-            else if(phase==9){var care=new CareWindow(this);care.Show();checks["cleanupDefaultNoSelection"]=!care.HasSelection;Capture(care,"care-preview.png");care.Close();timer.Stop();Atomic("ui-smoke.json",new{passed=checks.Values.All(x=>x),checks=checks});Environment.ExitCode=checks.Values.All(x=>x)?0:1;Close();}
+            else if(phase==9){var power=new PowerWindow(this);power.Show();checks["powerPanel"]=power.IsVisible;Capture(power,"power-preview.png");power.Close();checks["powerBeforeApps"]=tiles.FindIndex(t=>t.App.Target=="fluid://power")<tiles.FindIndex(t=>t.App.Target==installed.First().Target);checks["powerSimulationOnly"]=Execute(new DockPlan{Intent="power",SystemAction="shutdown"},false).Contains("演示");Execute(new DockPlan{Intent="workspace_save",WorkspaceName="Smoke"},false);Execute(new DockPlan{Intent="workspace_switch",WorkspaceName="Smoke"},false);checks["workspaceSwitch"]=Settings.ActiveWorkspace=="Smoke";Execute(new DockPlan{Intent="workspace_switch",WorkspaceName="默认"},false);checks["workspaceReturn"]=Settings.ActiveWorkspace=="默认";OpenWorkspaces();var work=Application.Current.Windows.OfType<WorkspaceWindow>().First();checks["workspacePanel"]=work.IsVisible;Capture(work,"workspace-preview.png");work.Close();var care=new CareWindow(this);care.Show();checks["cleanupDefaultNoSelection"]=!care.HasSelection;Capture(care,"care-preview.png");care.Close();timer.Stop();Atomic("ui-smoke.json",new{passed=checks.Values.All(x=>x),checks=checks});Environment.ExitCode=checks.Values.All(x=>x)?0:1;Close();}
             phase++;
         }catch(Exception ex){timer.Stop();Atomic("ui-smoke.json",new{passed=false,error=ex.ToString(),phase=phase});Environment.ExitCode=1;Close();}};timer.Start();
     }

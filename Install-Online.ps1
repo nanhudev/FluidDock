@@ -6,7 +6,7 @@ $releases=Invoke-RestMethod -Uri 'https://api.github.com/repos/nanhudev/dockbot/
 $release=$releases|Where-Object {!$_.draft -and ($_.assets.name -contains 'DockBot.exe') -and ($_.assets.name -contains 'DockBot.exe.sha256')}|Select-Object -First 1
 if(!$release){throw 'No packaged DockBot release is available.'}
 $legacy=Join-Path $env:LOCALAPPDATA 'FluidDock'
-$destination=if(Test-Path -LiteralPath (Join-Path $legacy 'apps.json')){$legacy}else{Join-Path $env:LOCALAPPDATA 'Programs\DockBot'}
+$destination=Join-Path $env:LOCALAPPDATA 'Programs\DockBot'
 New-Item -ItemType Directory -Path $destination -Force|Out-Null
 $temporary=Join-Path $destination 'DockBot.exe.download'
 $asset=$release.assets|Where-Object name -eq 'DockBot.exe'|Select-Object -First 1
@@ -19,15 +19,22 @@ $algorithm=[Security.Cryptography.SHA256]::Create();$stream=[IO.File]::OpenRead(
 try{$actual=[BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-','')}finally{$stream.Dispose();$algorithm.Dispose()}
 if($expected -notmatch '^[a-fA-F0-9]{64}$' -or $actual -ne $expected){throw 'The download checksum did not match. Please retry.'}
 $executable=Join-Path $destination 'DockBot.exe'
+$shell=New-Object -ComObject WScript.Shell
+$shortcutPath=Join-Path ([Environment]::GetFolderPath('Programs')) 'DockBot.lnk'
+$startupPath=Join-Path ([Environment]::GetFolderPath('Startup')) 'DockBot.lnk'
+$profileArguments='';$previousExecutable=''
+foreach($existing in @($startupPath,$shortcutPath)){
+    if(Test-Path -LiteralPath $existing){$oldLink=$shell.CreateShortcut($existing);if($oldLink.TargetPath -like '*\DockBot.exe'){$previousExecutable=$oldLink.TargetPath};if($oldLink.Arguments -match '^--profile-dir "[^"]+"$'){$profileArguments=$oldLink.Arguments};[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($oldLink)}
+}
 foreach($process in Get-Process DockBot,FluidDock -ErrorAction SilentlyContinue){
-    try{if($process.Path -eq $executable -or $process.Path -eq (Join-Path $destination 'FluidDock.exe')){[void]$process.CloseMainWindow();if(!$process.WaitForExit(3000)){$process.Kill();$process.WaitForExit()}}}catch{}
+    try{if($process.Path -in @($executable,$previousExecutable,(Join-Path $legacy 'DockBot.exe'),(Join-Path $legacy 'FluidDock.exe'))){[void]$process.CloseMainWindow();if(!$process.WaitForExit(3000)){$process.Kill();$process.WaitForExit()}}}catch{}
 }
 Move-Item -LiteralPath $temporary -Destination $executable -Force
 Unblock-File -LiteralPath $executable
-$shortcutPath=Join-Path ([Environment]::GetFolderPath('Programs')) 'DockBot.lnk'
-$shell=New-Object -ComObject WScript.Shell
-$shortcut=$shell.CreateShortcut($shortcutPath);$shortcut.TargetPath=$executable;$shortcut.WorkingDirectory=$destination;$shortcut.Save()
+$shortcut=$shell.CreateShortcut($shortcutPath);$shortcut.TargetPath=$executable;$shortcut.Arguments=$profileArguments;$shortcut.WorkingDirectory=$destination;$shortcut.Save()
 [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcut)
+$startupPath=Join-Path ([Environment]::GetFolderPath('Startup')) 'DockBot.lnk'
+if(Test-Path -LiteralPath $startupPath){$startup=$shell.CreateShortcut($startupPath);$startup.TargetPath=$executable;$startup.Arguments=$profileArguments;$startup.WorkingDirectory=$destination;$startup.Save();[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($startup)}
 [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell)
-Start-Process -FilePath $executable -WorkingDirectory $destination -WindowStyle Hidden
+$launch=@{FilePath=$executable;WorkingDirectory=$destination;WindowStyle='Hidden'};if($profileArguments){$launch.ArgumentList=$profileArguments};Start-Process @launch
 Write-Host ('DockBot '+$release.tag_name+' is ready.')

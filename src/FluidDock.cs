@@ -1,4 +1,4 @@
-﻿using System;using System.IO;using System.Linq;using System.Text;using System.Collections.Generic;using System.Diagnostics;using System.Runtime.InteropServices;using System.Threading;using System.Threading.Tasks;using System.Web.Script.Serialization;using System.Windows;using System.Windows.Controls;using System.Windows.Input;using System.Windows.Media;using System.Windows.Media.Animation;using System.Windows.Media.Imaging;using System.Windows.Interop;using System.Windows.Threading;using Forms=System.Windows.Forms;
+using System;using System.IO;using System.Linq;using System.Text;using System.Collections.Generic;using System.Diagnostics;using System.Runtime.InteropServices;using System.Threading;using System.Threading.Tasks;using System.Web.Script.Serialization;using System.Windows;using System.Windows.Controls;using System.Windows.Input;using System.Windows.Media;using System.Windows.Media.Animation;using System.Windows.Media.Imaging;using System.Windows.Interop;using System.Windows.Threading;using Forms=System.Windows.Forms;
 public partial class Entry {public string Name{get;set;}public string Target{get;set;}public string Arguments{get;set;}public string WorkDir{get;set;}public string Icon{get;set;}public string Group{get;set;}public bool Pinned{get;set;}public bool Hidden{get;set;}public string[] ProcessNames{get;set;}}
 public class Use {public int Clicks{get;set;}public double Seconds{get;set;}}
 public partial class Prefs {public bool AutoHide{get;set;}public bool ReducedMotion{get;set;}public bool Adaptive{get;set;}public bool Widget{get;set;}public Prefs(){Adaptive=true;Widget=true;ReducedMotion=!SystemParameters.ClientAreaAnimation;DockScale=1;Appearance="glass";GroupOrder=new[]{"系统","AI","办公","开发","音乐","游戏","常用网站","其他工具"};}}
@@ -43,11 +43,11 @@ public partial class Dock:Window {
  DispatcherTimer monitor=new DispatcherTimer();Stopwatch time=Stopwatch.StartNew();double last,hide,hideV,hideTarget,baseWidth;bool rendering,dirty,closing;int ticks,dragIndex=-1;uint lastPid;Entry activeEntry;DateTime lastUsage=DateTime.UtcNow;bool resolving;
  public bool HotkeyRegistered;public double LastSearchMs;List<Tile> tiles=new List<Tile>();List<Border> dividers=new List<Border>();long surfaceWrites;bool measureHover;List<double> hoverFrameCosts=new List<double>(256),hoverFrameGaps=new List<double>(256);Stopwatch renderCostWatch=new Stopwatch();
  class Tile {public Entry App;public Button Button;public ScaleTransform Scale;public TranslateTransform Move;public double Reveal=1,RevealDelay,ScaleNow=1,ScaleV,Target=1,Center,Baseline,Lift,LiftV,Bounce,OffsetX,OffsetV,InitialX=Double.NaN;public Point Down;public bool Pressed;}
- [STAThread]public static void Main(string[] args){if(args.Contains("--record-demo")&&!args.Contains("--data-dir"))return;if(args.Contains("--self-test")){Environment.Exit(ProductTests.Run(Home));return;}bool first;using(var mutex=new Mutex(true,"Local\\FluidDock.Desktop.v1"+ProductData.InstanceSuffix(),out first)){if(!first){try{using(var signal=EventWaitHandle.OpenExisting("Local\\FluidDock.Toggle"+ProductData.InstanceSuffix()))signal.Set();}catch{}return;}try{var app=new Application{ShutdownMode=ShutdownMode.OnMainWindowClose};Theme(app);app.Run(new Dock(args));}catch(Exception ex){File.AppendAllText(Path.Combine(Home,"error.log"),DateTime.Now+" "+ex+"\r\n");Environment.ExitCode=1;}}}
+ [STAThread]public static void Main(string[] args){if(args.Contains("--record-demo")&&!args.Contains("--data-dir"))return;if(args.Contains("--enable-startup-only")){try{var path=Path.Combine(Home,"preferences.json");var prefs=DurableState.Load<Prefs>(path,()=>new Prefs());prefs.StartWithWindows=true;DurableState.Save(path,prefs);}catch{Environment.ExitCode=1;}return;}if(args.Contains("--self-test")){Environment.Exit(ProductTests.Run(Home));return;}bool first;using(var mutex=new Mutex(true,"Local\\FluidDock.Desktop.v1"+ProductData.InstanceSuffix(),out first)){if(!first){try{using(var signal=EventWaitHandle.OpenExisting("Local\\FluidDock.Toggle"+ProductData.InstanceSuffix()))signal.Set();}catch{}return;}try{var app=new Application{ShutdownMode=ShutdownMode.OnMainWindowClose};Theme(app);app.Run(new Dock(args));}catch(Exception ex){File.AppendAllText(Path.Combine(Home,"error.log"),DateTime.Now+" "+ex+"\r\n");Environment.ExitCode=1;}}}
  public Dock(string[] args){
- ProductData.Ensure(Home);Entries=Json.Deserialize<List<Entry>>(File.ReadAllText(Path.Combine(Home,"apps.json")));
- try{Settings=Json.Deserialize<Prefs>(File.ReadAllText(Path.Combine(Home,"preferences.json")));}catch{Settings=new Prefs();}
- try{Usage=Json.Deserialize<Dictionary<string,Use>>(File.ReadAllText(Path.Combine(Home,"usage.json")));}catch{}
+ Entries=DurableState.Load<List<Entry>>(Path.Combine(Home,"apps.json"),AppCatalog.Defaults);
+ Settings=DurableState.Load<Prefs>(Path.Combine(Home,"preferences.json"),()=>new Prefs());
+ Usage=DurableState.Load<Dictionary<string,Use>>(Path.Combine(Home,"usage.json"),()=>new Dictionary<string,Use>());
  MigrateCategories();if(Settings.Adaptive)SortSmart(false);
  Title="DockBot";Width=SystemParameters.WorkArea.Width-16;Height=156;WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;AllowsTransparency=true;Background=Brushes.Transparent;ShowInTaskbar=false;Topmost=true;ShowActivated=false;
  glass=new GlassWindow{Title="DockBot · Glass",Height=78,Width=900};glass.Show();Owner=glass;
@@ -80,7 +80,7 @@ public partial class Dock:Window {
  int GroupOrder(string s){int index=Array.IndexOf(Settings.GroupOrder??new[]{"系统","AI","办公","开发","音乐","游戏","常用网站","其他工具"},s);return index<0?8:index;}
  public void Rebuild(){
  var oldTiles=tiles.GroupBy(t=>AppCatalog.Key(t.App)).ToDictionary(g=>g.Key,g=>g.First());foreach(var t in tiles)canvas.Children.Remove(t.Button);tiles.Clear();foreach(var d in dividers)canvas.Children.Remove(d);dividers.Clear();
- var normal=Entries.Where(e=>e.Pinned&&!e.Hidden&&!Utility(e)).ToList();UpdateOnboarding(normal.Count==0);if(normal.Count>0){normal.Add(new Entry{Name="添加软件",Target="fluid://add",Group="其他工具"});normal.Add(new Entry{Name="搜索",Target="fluid://search",Group="其他工具"});}normal.Add(new Entry{Name="DockBot",Target="fluid://assistant",Group="助手"});var apps=Entries.Where(Utility).OrderBy(e=>e.Name=="此电脑"?0:e.Name=="桌面收纳"?1:2).Concat(normal.OrderBy(e=>GroupOrder(e.Group))).ToList();
+ var normal=Entries.Where(e=>e.Pinned&&!e.Hidden&&!Utility(e)).ToList();UpdateOnboarding(normal.Count==0);if(normal.Count>0){normal.Add(new Entry{Name="添加软件",Target="fluid://add",Group="其他工具"});normal.Add(new Entry{Name="搜索",Target="fluid://search",Group="其他工具"});}normal.Add(new Entry{Name="DockBot",Target="fluid://assistant",Group="助手"});normal.Add(new Entry{Name="电源",Target="fluid://power",Group="系统"});var apps=Entries.Where(Utility).OrderBy(e=>e.Name=="此电脑"?0:e.Name=="桌面收纳"?1:2).Concat(normal.OrderBy(e=>GroupOrder(e.Group))).ToList();
  int capacity=Math.Max(8,(int)((Width/Settings.DockScale-140)/36));if(apps.Count>capacity){var special=apps.Where(a=>a.Target.StartsWith("fluid://")).ToList();apps=apps.Where(a=>!a.Target.StartsWith("fluid://")).Take(capacity-special.Count).Concat(special).ToList();}double cell=Math.Max(24,Math.Min(58,(Width/Settings.DockScale-180)/Math.Max(1,apps.Count)));double x=0;string group="";
  foreach(var e in apps){
  if(group!=""&&e.Group!=group){x+=17;var d=new Border{Width=1,Height=29,Background=B("#35FFFFFF"),IsHitTestVisible=false,RenderTransform=new TranslateTransform()};Canvas.SetLeft(d,0);Canvas.SetTop(d,91);canvas.Children.Add(d);dividers.Add(d);}group=e.Group;
@@ -121,6 +121,7 @@ baseWidth=x;if(plateWidth<=0)plateWidth=baseWidth;LayoutDock();if(search!=null)s
  public void OpenCategory(string category){if(search==null){search=new SearchPanel(this);search.Prepare();}search.SetMode("library");search.Category=category;search.Reveal();}
  public FrameworkElement AppVisual(Entry e,double size){
  if(e.Target=="demo://parcel"||e.Target=="fluid://parcel")return new FileParcel{Width=size,Height=size};
+ if(e.Target=="fluid://power")return new PowerGlyph{Width=size,Height=size};
  if(e.Target=="fluid://assistant")return new BuddyFace{Width=size,Height=size};
  var grid=new Grid{Width=size,Height=size};var image=new Image{Width=size,Height=size,Stretch=Stretch.Uniform,SnapsToDevicePixels=true};
  var fallback=new Border{CornerRadius=new CornerRadius(12),Background=B("#4E586579"),BorderBrush=B("#35FFFFFF"),BorderThickness=new Thickness(1)};
@@ -153,14 +154,14 @@ baseWidth=x;if(plateWidth<=0)plateWidth=baseWidth;LayoutDock();if(search!=null)s
  public void SortSmart(bool rebuild){Entries=Entries.OrderBy(e=>GroupOrder(e.Group)).ThenByDescending(e=>Utility(e)?0:Score(e)).ToList();if(rebuild){SaveApps();Rebuild();Toast("已按分类和使用习惯整理");}}
  public void SaveApps(){Atomic("apps.json",Entries);if(search!=null)search.InvalidateCatalog();}
  public void Persist(){Atomic("usage.json",Usage);Atomic("preferences.json",Settings);dirty=false;}
- void Atomic(string name,object obj){string p=Path.Combine(Home,name);File.WriteAllText(p+".tmp",Json.Serialize(obj),Encoding.UTF8);File.Copy(p+".tmp",p,true);}
+ void Atomic(string name,object obj){DurableState.Save(Path.Combine(Home,name),obj);}
  public void Launch(Entry e){
- if(e.Target=="fluid://search"){OpenManager("library");return;}if(e.Target=="fluid://assistant"){OpenManager("assistant");return;}if(e.Target=="fluid://add"){OpenManager("add");return;}if(Settings.TrackUsage){GetUse(e).Clicks++;dirty=true;}if(search!=null)search.Dismiss();DispatchLaunch(e);
+ if(e.Target=="fluid://power"){OpenPower();return;}if(e.Target=="fluid://search"){OpenManager("library");return;}if(e.Target=="fluid://assistant"){OpenManager("assistant");return;}if(e.Target=="fluid://add"){OpenManager("add");return;}if(Settings.TrackUsage){GetUse(e).Clicks++;dirty=true;}if(search!=null)search.Dismiss();DispatchLaunch(e);
  }
  public void Toast(string text){tray.BalloonTipTitle="DockBot";tray.BalloonTipText=text;tray.ShowBalloonTip(2500);}
  static void MenuAction(ContextMenu m,string title,Action action){var item=new MenuItem{Header=title};item.Click+=(s,e)=>action();m.Items.Add(item);}
  ContextMenu Menu(){
- var m=new ContextMenu();MenuAction(m,"搜索应用    Ctrl + 空格",ToggleSearch);MenuAction(m,"添加软件…",()=>OpenManager("add"));MenuAction(m,"一键配置…",OpenSetup);MenuAction(m,"电脑整理…",OpenCare);MenuAction(m,"小助手",()=>OpenManager("assistant"));MenuAction(m,"移除入口…",()=>OpenManager("remove"));MenuAction(m,"添加搜索目录…",ChooseSearchRoot);MenuAction(m,"按使用习惯智能整理",()=>SortSmart(true));MenuAction(m,"使用统计",()=>OpenCategory("统计"));MenuAction(m,"管理隐藏应用",()=>OpenCategory("隐藏"));
+ var m=new ContextMenu();MenuAction(m,"搜索应用    Ctrl + 空格",ToggleSearch);MenuAction(m,"添加软件…",()=>OpenManager("add"));MenuAction(m,"一键配置…",OpenSetup);MenuAction(m,"工作空间…",OpenWorkspaces);MenuAction(m,"电脑整理…",OpenCare);MenuAction(m,"小助手",()=>OpenManager("assistant"));MenuAction(m,"移除入口…",()=>OpenManager("remove"));MenuAction(m,"添加搜索目录…",ChooseSearchRoot);MenuAction(m,"按使用习惯智能整理",()=>SortSmart(true));MenuAction(m,"使用统计",()=>OpenCategory("统计"));MenuAction(m,"管理隐藏应用",()=>OpenCategory("隐藏"));
  var hideItem=new MenuItem{Header="自动收起",IsCheckable=true,IsChecked=Settings.AutoHide};hideItem.Click+=(s,e)=>{Settings.AutoHide=hideItem.IsChecked;Persist();};m.Items.Add(hideItem);
  var reduce=new MenuItem{Header="减少动态效果",IsCheckable=true,IsChecked=Settings.ReducedMotion};reduce.Click+=(s,e)=>{Settings.ReducedMotion=reduce.IsChecked;ThemeState.ReducedMotion=Settings.ReducedMotion;Persist();Wake();};m.Items.Add(reduce);MenuAction(m,"显示桌面文件",DesktopSurface.Restore);MenuAction(m,"隐藏桌面文件",DesktopSurface.HideIcons);MenuAction(m,"退出 Dock",Close);return m;
  }
@@ -179,7 +180,7 @@ baseWidth=x;if(plateWidth<=0)plateWidth=baseWidth;LayoutDock();if(search!=null)s
  dropBadge.Visibility=Visibility.Collapsed;rim.BorderBrush=Brushes.Transparent;
  if(e.Data.GetDataPresent("FluidDock.Entry")){
  string name=e.Data.GetData("FluidDock.Entry") as string;var item=Entries.FirstOrDefault(a=>a.Name==name);var p=e.GetPosition(canvas);var dest=tiles.OrderBy(t=>Math.Abs(t.Center-p.X)).FirstOrDefault();
- if(item!=null&&dest!=null&&!Utility(item)&&!Utility(dest.App)&&dest.App.Target!="fluid://search"){Entries.Remove(item);int index=Entries.IndexOf(dest.App);item.Group=dest.App.Group;Entries.Insert(Math.Max(0,index),item);SaveApps();Rebuild();}return;}
+ if(item!=null&&dest!=null&&!Utility(item)&&!Utility(dest.App)&&dest.App.Target!="fluid://search"){Settings.Adaptive=false;Entries.Remove(item);int index=Entries.IndexOf(dest.App);item.Group=dest.App.Group;Entries.Insert(Math.Max(0,index),item);SaveApps();Persist();Rebuild();}return;}
  var files=e.Data.GetData(DataFormats.FileDrop) as string[];if(files!=null)foreach(var p in files)AddPath(p);e.Handled=true;
  }
  public void Pick(){Pick(null);}

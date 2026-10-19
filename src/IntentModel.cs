@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -36,11 +36,12 @@ public sealed class IntentModel {
     }
 }
 public sealed class DockPlan {
+    public string WorkspaceName="",NewName="",SystemAction="";
     public string Intent="unknown",AppName="",OtherName="",TargetKey="",Group="",OtherGroup="",Theme="",Direction="",Message="",Source="rules";
     public bool Enable=true;public double Scale,Delta,Confidence=1;
     public Entry ResolvedEntry;
     public List<DockPlan> Steps;
-    public bool Actionable {get{return new[]{"add","remove","move","group","sort","theme","size","autohide","startup","widget","tracking","undo","open","close","configure","care","batch"}.Contains(Intent);}}
+    public bool Actionable {get{return new[]{"add","remove","move","group","sort","theme","size","autohide","startup","widget","tracking","undo","open","close","configure","care","batch","power","app_restart","app_focus","app_minimize","app_maximize","system_settings","system_folder","workspace_switch","workspace_save","workspace_create","workspace_delete","workspace_rename","workspace_list","workspace_open","workspace_add","rename","hide","show","locate","usage"}.Contains(Intent);}}
 }
 public sealed class DockIntent {
     readonly IntentModel model=new IntentModel();
@@ -49,10 +50,13 @@ public sealed class DockIntent {
     public DockPlan Parse(string text,IEnumerable<Entry> catalog){
         string q=(text??"").Trim();var p=new DockPlan();
         if(q.Length==0||q.Length>240){p.Message="请用一句话描述一个 Dock 操作。";return p;}
+        var systemPlan=SystemIntents.Parse(q,catalog);if(systemPlan!=null)return systemPlan;
+        if(Has(q,@"工作区|工作空间|workspace|模式")&&Has(q,@"清理|格式化|卸载|执行|powershell|上传|关机|重启")){p.Message="请把工作空间切换和电脑维护分开操作。";return p;}
         if(Has(q,@"不要|别|暂不|不想")&&Has(q,@"清理|整理桌面|关闭|打开|一键配置")){p.Message="没有改动。";return p;}
         if(Has(q,@"清理|整理桌面|桌面整理|大文件|磁盘空间|电脑管理")){p.Intent="care";return p;}
         if(Has(q,@"一键配置|自动配置|配置dock|推荐软件|常用软件推荐")){p.Intent="configure";return p;}
         if(Has(q,@"卸载|格式化|执行|清空回收站|删除.{0,5}(文件|磁盘|目录)|下载安装|帮我安装|上传|powershell|cmd\.exe")){p.Message="我只管理 Dock 入口，不卸载软件、删除文件或执行命令。";return p;}
+        var extended=ExtendedIntent.Parse(q,catalog);if(extended!=null)return extended;
         if(Has(q,@"^(怎么|如何)|你能|帮助|help|能做什么|功能|例子")){p.Intent="help";p.Message="试试：添加微信、移除 QQ、把 GPT 放到最前面、图标小一点、换成石墨风格。";return p;}
         if(Has(q,@"不要.{0,3}(删|移除|添加|固定|缩小|放大|移动|排序|更换|调整)|别.{0,3}(删|移除|添加|固定|缩小|放大|移动|排序|更换|调整)|不要关闭|别关闭|不要取消")){p.Message="没有改动。需要整理时直接告诉我。";return p;}
         p.Enable=!Has(q,@"关闭|不要|取消|停用|禁用|暂停|不显示|不启动|不记录|别统计|别记录|disable|\boff\b");
@@ -72,6 +76,8 @@ public sealed class DockIntent {
         else if(Has(q,@"最前|最后|往左|往右|向左|向右|左边|右边|之前|之后|前面|后面|前边|后边|挪|搬|交换|顺序|\bmove\b"))p.Intent="move";
         else if(Has(q,@"搜索|查找|定位|路径|哪里|在哪|指向|快捷方式|\bexe\b|\bfind\b|\bsearch\b"))p.Intent="search";
         else{var prediction=model.Predict(q);p.Intent=prediction.Confidence>=.62&&prediction.Margin>=.45?prediction.Intent:"unknown";p.Confidence=prediction.Confidence;p.Source="ngram-model";}
+        if(p.Intent.StartsWith("workspace_")){p.Intent="unknown";p.Message="请指定工作空间名称，例如“切换到开发工作区”。";return p;}
+        if(p.Intent=="rename"){p.Intent="unknown";p.Message="请同时给出入口和新名称。";return p;}
         if(p.Intent=="widget"&&Has(q,"隐藏|藏起来"))p.Enable=false;
         if(p.Intent=="autohide"&&Has(q,"一直显示|总是显示"))p.Enable=false;
         if(p.Intent=="add"){
@@ -103,7 +109,7 @@ public sealed class DockIntent {
             if(n.Success){double v=double.Parse(n.Groups[1].Value,System.Globalization.CultureInfo.InvariantCulture);p.Scale=n.Groups[2].Value=="倍"?v:v>2?v/100:v;if(p.Scale<.65||p.Scale>1.4){p.Intent="unknown";p.Message="大小支持 65%–140%。";}}
             else p.Delta=Has(q,"小一点|缩小|变小|太大|紧凑|smaller")?-.1:.1;
         }
-        if(new[]{"add","remove","move","group","open","close"}.Contains(p.Intent)&&p.AppName==""){p.Message="没有找到软件。搜索或拖入入口。";p.Intent="unknown";}
+        if(new[]{"add","remove","move","group","open","close","hide","show","locate"}.Contains(p.Intent)&&p.AppName==""){p.Message="没有找到软件。搜索或拖入入口。";p.Intent="unknown";}
         if(p.Intent=="group"&&p.Group==""){p.Intent="help";p.Message="可用分类：AI、办公、游戏、其他工具。";}
         if(p.Intent=="unknown"&&p.Message=="")p.Message="我只处理 Dock 操作。试试“添加微信”“图标小一点”或“换成石墨”。";
         return p;

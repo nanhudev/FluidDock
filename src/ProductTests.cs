@@ -89,6 +89,7 @@ public static class ProductTests {
             check("catalog-migration",fromCatalog.Repaired&&fromCatalog.Entry.Target==moved,"install catalog repairs moved entries using identity");
             File.Delete(moved);File.Delete(wrong);Directory.Delete(a);Directory.Delete(b);Directory.Delete(folder);
         }catch(Exception ex){check("migration-fixture",false,ex.Message);}
+        WorkspaceTests.Run(check);PersistenceTests.Run(output,check);SystemIntentTests.Run(check);
         var model=new IntentModel();var predictions=new List<object>();foreach(string q in new[]{"软件收上来","微信留在这里","这个图标先撤下","再紧凑一点","帮我写封邮件"}){var p=model.Predict(q);predictions.Add(new{text=q,intent=p.Intent,confidence=p.Confidence,margin=p.Margin});}
         File.WriteAllText(Path.Combine(output,"self-test.json"),Dock.Json.Serialize(new{passed=failures==0,checks=rows.Count,failures=failures,elapsedMs=watch.Elapsed.TotalMilliseconds,cases=rows,modelProbes=predictions}),System.Text.Encoding.UTF8);
         return failures==0?0:1;

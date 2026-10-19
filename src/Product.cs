@@ -21,24 +21,32 @@ public partial class Prefs {
 public static class ProductData {
     public static string InstanceSuffix(){if(!Environment.GetCommandLineArgs().Contains("--data-dir"))return "";using(var sha=System.Security.Cryptography.SHA256.Create())return "."+BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(Location().ToLowerInvariant()))).Replace("-","").Substring(0,12);}
     public static string Location(){
-        var args=Environment.GetCommandLineArgs();int i=Array.IndexOf(args,"--data-dir");
-        string local=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),legacy=Path.Combine(local,"FluidDock");
-        string folder=i>=0&&i+1<args.Length?Path.GetFullPath(args[i+1]):File.Exists(Path.Combine(legacy,"apps.json"))?legacy:Path.Combine(local,"DockBot");
+        var args=Environment.GetCommandLineArgs();int i=Array.IndexOf(args,"--data-dir");if(i<0)i=Array.IndexOf(args,"--profile-dir");
+        if(i>=0&&(i+1>=args.Length||args[i+1].StartsWith("--")))throw new ArgumentException("--data-dir requires a directory.");
+        string local=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string folder=i>=0&&i+1<args.Length?Path.GetFullPath(args[i+1]):DurableState.ResolveHome(local);
         Directory.CreateDirectory(folder);Directory.CreateDirectory(Path.Combine(folder,"icons"));return folder;
     }
     public static void Ensure(string home){
         var path=Path.Combine(home,"apps.json");
-        if(!File.Exists(path))File.WriteAllText(path,Dock.Json.Serialize(AppCatalog.Defaults()),System.Text.Encoding.UTF8);
+        DurableState.Load<List<Entry>>(path,AppCatalog.Defaults);
     }
 }
-public sealed class DockSnapshot {public List<Entry> Apps;public Prefs Settings;}
+public sealed class DockSnapshot {public List<Entry> Apps;public Prefs Settings;public string RenamedFrom,RenamedTo;}
 public static class CommandActions {
     public static string Apply(DockPlan plan,List<Entry> entries,Prefs settings,IEnumerable<Entry> catalog){
+        if(plan.Intent.StartsWith("workspace_"))return WorkspaceStore.Apply(plan,entries,settings,catalog);
         if(plan.Intent=="batch"){
             if(plan.Steps==null||plan.Steps.Count==0||plan.Steps.Count>8||plan.Steps.Any(s=>!new[]{"add","group"}.Contains(s.Intent)))throw new InvalidOperationException("不支持组合执行这些操作。");
             var draft=Dock.Json.Deserialize<List<Entry>>(Dock.Json.Serialize(entries));foreach(var step in plan.Steps)Apply(step,draft,settings,catalog);entries.Clear();entries.AddRange(draft);return "已应用";
         }
         var app=entries.FirstOrDefault(e=>String.Equals(e.Name,plan.AppName,StringComparison.OrdinalIgnoreCase));
+        if(new[]{"rename","hide","show"}.Contains(plan.Intent)){
+            if(app==null&&plan.Intent=="show")return Apply(new DockPlan{Intent="add",AppName=plan.AppName,ResolvedEntry=plan.ResolvedEntry,TargetKey=plan.TargetKey},entries,settings,catalog);
+            if(app==null||WorkspaceStore.SystemEntry(app))throw new InvalidOperationException("请选择已保存的软件入口。");
+            if(plan.Intent=="rename"){string name=WorkspaceStore.Name(plan.NewName);if(entries.Any(e=>e!=app&&String.Equals(e.Name,name,StringComparison.OrdinalIgnoreCase)))throw new InvalidOperationException("已有同名入口。");app.Name=name;return "已改名 · "+name;}
+            app.Hidden=plan.Intent=="hide";if(!app.Hidden)app.Pinned=true;return app.Hidden?"已隐藏入口 · "+app.Name:"已恢复入口 · "+app.Name;
+        }
         if(plan.Intent=="add"){
             var candidate=plan.ResolvedEntry??catalog.FirstOrDefault(e=>plan.TargetKey!=""?AppCatalog.Key(e)==plan.TargetKey:String.Equals(e.Name,plan.AppName,StringComparison.OrdinalIgnoreCase));
             if(candidate==null)throw new InvalidOperationException("没有找到此软件，请选择快捷方式或 EXE。");
@@ -109,8 +117,11 @@ public partial class Dock {
     public string ShortcutLabel="Ctrl + 空格";
     EventWaitHandle toggleEvent;RegisteredWaitHandle toggleWait;
     public IEnumerable<Entry> AllApps(){return Entries.Concat(installed).GroupBy(AppCatalog.Key,StringComparer.OrdinalIgnoreCase).Select(g=>g.First());}
-    public DockPlan Interpret(string query){return intent.Parse(query,AllApps());}
+    public DockPlan Interpret(string query){var plan=intent.Parse(query,AllApps());if(plan.Intent=="workspace_switch"||plan.Intent=="workspace_open"){
+            if(WorkspaceStore.Find(Settings,plan.WorkspaceName)==null&&!WorkspaceStore.Template(plan.WorkspaceName)&&plan.WorkspaceName!="默认")return new DockPlan{Message="还没有“"+plan.WorkspaceName+"”。先保存当前布局为这个工作空间。"};
+        }return plan;}
     void InitializeProduct(){
+        try{string cache=Path.Combine(Home,"catalog-cache.json");if(File.Exists(cache)||File.Exists(cache+".bak"))installed=DurableState.Load<List<Entry>>(cache,()=>new List<Entry>());}catch{}
         toggleEvent=new EventWaitHandle(false,EventResetMode.AutoReset,"Local\\FluidDock.Toggle"+ProductData.InstanceSuffix());
         toggleWait=ThreadPool.RegisterWaitForSingleObject(toggleEvent,(s,t)=>Dispatcher.BeginInvoke(new Action(ToggleSearch)),null,Timeout.Infinite,false);
         Closed+=(s,e)=>{if(toggleWait!=null)toggleWait.Unregister(null);toggleEvent.Dispose();};
@@ -123,12 +134,24 @@ public partial class Dock {
         if(indexing||(DateTime.UtcNow-lastCatalogScan).TotalSeconds<10)return;indexing=true;lastCatalogScan=DateTime.UtcNow;
         var roots=Settings.SearchRoots;
         var thread=new Thread(()=>{
-            var found=AppCatalog.Discover();if(roots!=null)foreach(var root in roots)found.AddRange(AppCatalog.ScanFolder(root,3,300));
+            List<Entry> found;
+            try{found=AppCatalog.Discover();if(roots!=null)foreach(var root in roots)found.AddRange(AppCatalog.ScanFolder(root,3,300));}
+            catch(Exception ex){try{File.AppendAllText(Path.Combine(Home,"error.log"),DateTime.UtcNow+" catalog: "+ex+Environment.NewLine);Dispatcher.BeginInvoke(new Action(()=>{indexing=false;CatalogReady=true;}));}catch{}return;}
+            try{DurableState.Save(Path.Combine(Home,"catalog-cache.json"),found);}catch{}
             Dispatcher.BeginInvoke(new Action(()=>{indexing=false;if(closing)return;installed=found;CatalogReady=true;if(search!=null)search.InvalidateCatalog();if(bindings!=null)bindings.Request();}));
         });thread.IsBackground=true;thread.SetApartmentState(ApartmentState.STA);thread.Start();
     }
     public void OpenManager(string mode){if(search==null){search=new SearchPanel(this);search.Prepare();}search.SetMode(mode);search.Reveal();}
     public string Execute(DockPlan plan,bool animate=true){
+        if(new[]{"power","app_restart","app_focus","app_minimize","app_maximize","system_settings","system_folder"}.Contains(plan.Intent))return ExecuteSystem(plan);
+        if(plan.Intent=="workspace_list"){OpenWorkspaces();return "选择工作空间。";}
+        if(plan.Intent=="workspace_open"){
+            var members=WorkspaceStore.Members(Settings,plan.WorkspaceName,Entries);if(members.Count==0)return "这个工作空间没有应用。";if(members.Count>12)throw new InvalidOperationException("一次最多启动 12 个入口，请分批打开。");
+            int launched=0;foreach(var saved in members){var current=AllApps().FirstOrDefault(e=>AppCatalog.Key(e)==AppCatalog.Key(saved)||(!String.IsNullOrEmpty(saved.Id)&&saved.Id==e.Id))??saved;try{DispatchLaunch(current);launched++;}catch{}}
+            return "已请求打开 "+launched+" / "+members.Count+" 个入口";
+        }
+        if(plan.Intent=="locate"){var target=AllApps().FirstOrDefault(e=>AppCatalog.Key(e)==plan.TargetKey);if(target==null||!File.Exists(target.Target))throw new InvalidOperationException("没有可定位的本地文件。");Process.Start("explorer.exe","/select,\""+target.Target+"\"");return "已显示文件位置";}
+        if(plan.Intent=="usage"){OpenCategory("统计");return "本机使用统计";}
         if(plan.Intent=="care"){OpenCare();return "勾选后处理。";}
         if(plan.Intent=="configure"){OpenSetup();return "选择配置。";}
         if(plan.Intent=="open"||plan.Intent=="close"){
@@ -140,7 +163,7 @@ public partial class Dock {
         }
         if(plan.Intent=="undo"){
             if(undo.Count==0)return "暂时没有可撤销的改动。";
-            var state=undo.Pop();Entries=state.Apps;Settings=state.Settings;SaveApps();Persist();ApplyAppearance();Rebuild();SyncWidget();SyncStartup();return "已恢复上一步";
+            var state=undo.Pop();if(state.RenamedFrom!=null&&state.RenamedTo!=null&&Usage.ContainsKey(state.RenamedTo)){Usage[state.RenamedFrom]=Usage[state.RenamedTo];Usage.Remove(state.RenamedTo);dirty=true;}activeEntry=null;lastPid=0;Entries=state.Apps;Settings=state.Settings;SaveApps();Persist();ApplyAppearance();Rebuild();SyncWidget();SyncStartup();return "已恢复上一步";
         }
         var snapshot=new DockSnapshot{Apps=Json.Deserialize<List<Entry>>(Json.Serialize(Entries)),Settings=Json.Deserialize<Prefs>(Json.Serialize(Settings))};
         var before=Entries.FirstOrDefault(e=>e.Name==plan.AppName);Point? from=before==null?(Point?)null:IconScreenPoint(before);
@@ -150,6 +173,7 @@ public partial class Dock {
         undo.Push(snapshot);
         if(plan.Intent=="sort"&&plan.Group=="")SortSmart(false);
         if(animate&&!Settings.ReducedMotion){if(plan.Intent=="batch")foreach(var item in plan.Steps)carryingNames.Add(item.AppName);else if(new[]{"add","move","group"}.Contains(plan.Intent))carryingNames.Add(plan.AppName);}
+        if(plan.Intent=="rename"&&before!=null&&Usage.ContainsKey(plan.AppName)){snapshot.RenamedFrom=plan.AppName;snapshot.RenamedTo=before.Name;Usage[before.Name]=Usage[plan.AppName];if(before.Name!=plan.AppName)Usage.Remove(plan.AppName);dirty=true;}
         SaveApps();Persist();ApplyAppearance();Rebuild();SyncWidget();if(bindings!=null){bindings.ResetWatchers();bindings.Request();}if(plan.Intent=="startup")SyncStartup();
         var changed=Entries.FirstOrDefault(e=>e.Name==plan.AppName);
         if(animate&&!Settings.ReducedMotion&&plan.Intent=="batch"){
@@ -171,7 +195,7 @@ public partial class Dock {
         if(!Settings.StartWithWindows){if(File.Exists(path))File.Delete(path);return;}
         string legacy=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup),"Fluid Dock.lnk");if(File.Exists(legacy))File.Delete(legacy);
         dynamic shell=Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));dynamic link=shell.CreateShortcut(path);
-        try{link.TargetPath=System.Reflection.Assembly.GetExecutingAssembly().Location;link.WorkingDirectory=Path.GetDirectoryName(link.TargetPath);link.Description="FluidDock";link.Save();}
+        try{link.TargetPath=System.Reflection.Assembly.GetExecutingAssembly().Location;link.Arguments="--profile-dir \""+Home+"\"";link.WorkingDirectory=Path.GetDirectoryName(link.TargetPath);link.Description="DockBot";link.Save();}
         finally{System.Runtime.InteropServices.Marshal.FinalReleaseComObject(link);System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell);}
     }
     void SyncWidget(){if(Settings.Widget&&widget==null){widget=new ClockWidget(this);widget.Closed+=(s,e)=>widget=null;widget.Show();}else if(!Settings.Widget&&widget!=null){widget.Close();widget=null;}}
