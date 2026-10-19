@@ -28,12 +28,15 @@ public static partial class Native {
  public static bool Glass(Window w){var h=new WindowInteropHelper(w).EnsureHandle();var src=HwndSource.FromHwnd(h);if(src!=null)src.CompositionTarget.BackgroundColor=Colors.Transparent;var margin=new MARGINS{L=-1};DwmExtendFrameIntoClientArea(h,ref margin);
  var accent=new ACCENT{State=3,Flags=0,Color=0,Animation=0};int size=Marshal.SizeOf(accent);IntPtr mem=Marshal.AllocHGlobal(size);bool ok=false;
  try{Marshal.StructureToPtr(accent,mem,false);var c=new COMPOSITION{Attribute=19,Data=mem,Size=size};ok=SetWindowCompositionAttribute(h,ref c)!=0;}finally{Marshal.FreeHGlobal(mem);}int corner=1;DwmSetWindowAttribute(h,33,ref corner,4);int dark=1;DwmSetWindowAttribute(h,20,ref dark,4);int noBorder=unchecked((int)0xFFFFFFFE);DwmSetWindowAttribute(h,34,ref noBorder,4);Round(w);return ok;}
- static Dictionary<IntPtr,long> roundedSizes=new Dictionary<IntPtr,long>();
- public static void Round(Window w){var h=new WindowInteropHelper(w).Handle;if(h==IntPtr.Zero||w.Width<=0||w.Height<=0)return;var src=PresentationSource.FromVisual(w);double scale=src==null?1:src.CompositionTarget.TransformToDevice.M11;int width=(int)(w.Width*scale)+1,height=(int)(w.Height*scale)+1;long key=((long)width<<32)|(uint)height;long old;if(roundedSizes.TryGetValue(h,out old)&&old==key)return;roundedSizes[h]=key;var region=CreateRoundRectRgn(0,0,width,height,(int)(28*scale),(int)(28*scale));if(SetWindowRgn(h,region,true)==0)DeleteObject(region);}
+ static Dictionary<IntPtr,string> roundedSizes=new Dictionary<IntPtr,string>();
+ public static void ForgetRound(Window w){roundedSizes.Remove(new WindowInteropHelper(w).Handle);}
+ public static void Round(Window w){var h=new WindowInteropHelper(w).Handle;if(h==IntPtr.Zero||w.Width<=0||w.Height<=0)return;var src=PresentationSource.FromVisual(w);double scale=src==null?1:src.CompositionTarget.TransformToDevice.M11;int width=(int)Math.Ceiling(w.Width*scale),height=(int)Math.Ceiling(w.Height*scale);var glassWindow=w as GlassWindow;double radius=glassWindow==null?24:glassWindow.SurfaceRadius;int diameter=(int)Math.Round(Math.Min(Math.Min(width,height),2*radius*scale));string key=width+":"+height+":"+diameter;string old;if(roundedSizes.TryGetValue(h,out old)&&old==key)return;var region=CreateRoundRectRgn(0,0,width+1,height+1,diameter,diameter);if(region==IntPtr.Zero)return;if(SetWindowRgn(h,region,true)==0){DeleteObject(region);return;}roundedSizes[h]=key;}
+
 }
 public class GlassWindow:Window {
  public bool GlassEnabled;
- public GlassWindow(){WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;Background=Brushes.Transparent;ShowInTaskbar=false;Topmost=true;ShowActivated=false;SourceInitialized+=(s,e)=>GlassEnabled=Native.Glass(this);SizeChanged+=(s,e)=>Native.Round(this);}
+ double surfaceRadius=24;public double SurfaceRadius{get{return surfaceRadius;}set{if(Math.Abs(surfaceRadius-value)<.001)return;surfaceRadius=value;Native.Round(this);}}
+ public GlassWindow(){WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;Background=Brushes.Transparent;ShowInTaskbar=false;Topmost=true;ShowActivated=false;SourceInitialized+=(s,e)=>GlassEnabled=Native.Glass(this);SizeChanged+=(s,e)=>Native.Round(this);Closed+=(s,e)=>Native.ForgetRound(this);}
 }
 public partial class Dock:Window {
  public bool ClosingDock{get{return closing;}}
@@ -50,7 +53,7 @@ public partial class Dock:Window {
  Usage=DurableState.Load<Dictionary<string,Use>>(Path.Combine(Home,"usage.json"),()=>new Dictionary<string,Use>());
  MigrateCategories();if(Settings.Adaptive)SortSmart(false);
  Title="DockBot";Width=SystemParameters.WorkArea.Width-16;Height=156;WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;AllowsTransparency=true;Background=Brushes.Transparent;ShowInTaskbar=false;Topmost=true;ShowActivated=false;
- glass=new GlassWindow{Title="DockBot · Glass",Height=78,Width=900};glass.Show();Owner=glass;
+ glass=new GlassWindow{Title="DockBot · Glass",Height=78,Width=900,SurfaceRadius=25};glass.Show();Owner=glass;
  canvas=new Canvas();Content=canvas;rim=new Border{Height=78,CornerRadius=new CornerRadius(25),BorderThickness=new Thickness(0),BorderBrush=Brushes.Transparent,Background=new LinearGradientBrush(Color.FromArgb(34,24,31,43),Color.FromArgb(55,14,19,29),90)};rim.ContextMenu=Menu();canvas.Children.Add(rim);
  captionText=Text("",12,"#FFFFFF");captionText.Margin=new Thickness(12,6,12,6);caption=new Border{Child=captionText,Background=B("#E5252932"),CornerRadius=new CornerRadius(9),BorderBrush=Brushes.Transparent,BorderThickness=new Thickness(0),Opacity=0,IsHitTestVisible=false};canvas.Children.Add(caption);
  var dropText=Text("＋ 释放以添加到 Dock",14,"#FFFFFF");dropText.Margin=new Thickness(22,12,22,12);dropBadge=new Border{Child=dropText,Background=B("#DC386E8C"),CornerRadius=new CornerRadius(18),Visibility=Visibility.Collapsed,IsHitTestVisible=false};canvas.Children.Add(dropBadge);
@@ -99,7 +102,7 @@ baseWidth=x;if(plateWidth<=0)plateWidth=baseWidth;LayoutDock();if(search!=null)s
  foreach(var t in tiles){double extra=Math.Max(0,t.ScaleNow-1)*cell*.72;t.Center=left+t.Baseline+shift+extra/2;t.Scale.ScaleX=t.Scale.ScaleY=t.ScaleNow;double destination=t.Center-t.Button.Width/2;if(!Double.IsNaN(t.InitialX)){t.OffsetX=t.InitialX-destination;t.InitialX=Double.NaN;}t.Move.X=destination+t.OffsetX;t.Move.Y=hide+t.Lift+t.Bounce;shift+=extra;
  if(group!=""&&t.App.Group!=group&&divider<dividers.Count){var d=dividers[divider++];var move=(TranslateTransform)d.RenderTransform;move.X=t.Center-t.Button.Width/2-9;move.Y=hide;}group=t.App.Group;}
  double visibleWidth=plateWidth>0?plateWidth:baseWidth;double plateLeft=(Width-visibleWidth)/2-7;rim.Width=visibleWidth+14;if(onboarding!=null){Canvas.SetLeft(onboarding,(Width-112)/2);Canvas.SetTop(onboarding,20+hide);}Canvas.SetLeft(rim,plateLeft);Canvas.SetTop(rim,68+hide);
- double nativeWidth=(visibleWidth+14)*Settings.DockScale,nativeLeft=Left+(Width-nativeWidth)/2,nativeTop=Top+Height-(156-68-hide)*Settings.DockScale;glass.Height=78*Settings.DockScale;if(Math.Abs(glass.Width-nativeWidth)>.5){glass.Width=nativeWidth;surfaceWrites++;}if(Math.Abs(glass.Left-nativeLeft)>.25){glass.Left=nativeLeft;surfaceWrites++;}if(Math.Abs(glass.Top-nativeTop)>.25){glass.Top=nativeTop;surfaceWrites++;}glass.Visibility=hide>100?Visibility.Hidden:Visibility.Visible;Canvas.SetLeft(dropBadge,(Width-250)/2);Canvas.SetTop(dropBadge,6);
+ double nativeWidth=(visibleWidth+14)*Settings.DockScale,nativeLeft=Left+(Width-nativeWidth)/2,nativeTop=Top+Height-(156-68-hide)*Settings.DockScale;glass.SurfaceRadius=25*Settings.DockScale;glass.Height=78*Settings.DockScale;if(Math.Abs(glass.Width-nativeWidth)>.5){glass.Width=nativeWidth;surfaceWrites++;}if(Math.Abs(glass.Left-nativeLeft)>.25){glass.Left=nativeLeft;surfaceWrites++;}if(Math.Abs(glass.Top-nativeTop)>.25){glass.Top=nativeTop;surfaceWrites++;}glass.Visibility=hide>100?Visibility.Hidden:Visibility.Visible;Canvas.SetLeft(dropBadge,(Width-250)/2);Canvas.SetTop(dropBadge,6);
  }
  void Pointer(Point p){
  if(dragIndex>=0)return;botTarget=0;double origin=(Width-baseWidth)/2;Tile nearest=null;double nd=9999;
