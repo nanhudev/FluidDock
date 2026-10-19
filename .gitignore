@@ -1,0 +1,14 @@
+bin/
+dist/
+obj/
+.vs/
+*.user
+*.log
+apps.json
+usage*.json
+preferences.json
+icons/
+local-data/
+test-results/
+__pycache__/
+*.tmp

@@ -1,0 +1,274 @@
+{"intent": "open", "text": "打开微信"}
+{"intent": "open", "text": "开一下应用"}
+{"intent": "open", "text": "启动软件"}
+{"intent": "open", "text": "运行应用"}
+{"intent": "open", "text": "open app"}
+{"intent": "open", "text": "launch app"}
+{"intent": "open", "text": "帮我打开软件"}
+{"intent": "open", "text": "把程序打开"}
+{"intent": "open", "text": "启动游戏"}
+{"intent": "open", "text": "开一下浏览器"}
+{"intent": "open", "text": "我要打开应用"}
+{"intent": "open", "text": "应用启动一下"}
+{"intent": "close", "text": "关闭微信"}
+{"intent": "close", "text": "关掉应用"}
+{"intent": "close", "text": "退出软件"}
+{"intent": "close", "text": "close app"}
+{"intent": "close", "text": "quit app"}
+{"intent": "close", "text": "把程序关上"}
+{"intent": "close", "text": "帮我关掉软件"}
+{"intent": "close", "text": "退出游戏"}
+{"intent": "close", "text": "结束应用窗口"}
+{"intent": "close", "text": "应用关一下"}
+{"intent": "close", "text": "关闭浏览器"}
+{"intent": "close", "text": "请求关闭程序"}
+{"intent": "configure", "text": "一键配置dock"}
+{"intent": "configure", "text": "自动配置底栏"}
+{"intent": "configure", "text": "推荐常用软件"}
+{"intent": "configure", "text": "生成dock配置"}
+{"intent": "configure", "text": "配置我的dock"}
+{"intent": "configure", "text": "常用软件推荐"}
+{"intent": "configure", "text": "初始配置"}
+{"intent": "configure", "text": "帮我配置启动栏"}
+{"intent": "configure", "text": "推荐我的常用软件"}
+{"intent": "configure", "text": "自动选择常用入口"}
+{"intent": "configure", "text": "一键配置"}
+{"intent": "configure", "text": "dock setup"}
+{"intent": "care", "text": "清理c盘"}
+{"intent": "care", "text": "整理桌面"}
+{"intent": "care", "text": "清理大文件"}
+{"intent": "care", "text": "扫描临时文件"}
+{"intent": "care", "text": "电脑整理"}
+{"intent": "care", "text": "清理电脑"}
+{"intent": "care", "text": "磁盘空间不够"}
+{"intent": "care", "text": "管理电脑文件"}
+{"intent": "care", "text": "清理下载文件"}
+{"intent": "care", "text": "查看大文件"}
+{"intent": "care", "text": "电脑管理"}
+{"intent": "care", "text": "cleanup disk"}
+{"intent": "add", "text": "把应用添加到dock"}
+{"intent": "add", "text": "固定应用"}
+{"intent": "add", "text": "加入应用"}
+{"intent": "add", "text": "把应用放进启动栏"}
+{"intent": "add", "text": "应用也要放上来"}
+{"intent": "add", "text": "把这个软件加进去"}
+{"intent": "add", "text": "pin app"}
+{"intent": "add", "text": "add app to dock"}
+{"intent": "add", "text": "我想把应用放在底栏"}
+{"intent": "add", "text": "应用留在这里"}
+{"intent": "add", "text": "增加一个应用入口"}
+{"intent": "add", "text": "把程序钉住"}
+{"intent": "add", "text": "将软件加入栏中"}
+{"intent": "add", "text": "应用放上去"}
+{"intent": "add", "text": "把应用收进来"}
+{"intent": "add", "text": "这程序要常驻"}
+{"intent": "add", "text": "加个应用"}
+{"intent": "add", "text": "把应用加上"}
+{"intent": "add", "text": "加入这个快捷方式"}
+{"intent": "add", "text": "放一个应用在栏里"}
+{"intent": "remove", "text": "把应用从dock移除"}
+{"intent": "remove", "text": "不要应用入口"}
+{"intent": "remove", "text": "把应用拿掉"}
+{"intent": "remove", "text": "删除应用快捷方式"}
+{"intent": "remove", "text": "从栏里去掉应用"}
+{"intent": "remove", "text": "应用不要放这了"}
+{"intent": "remove", "text": "unpin app"}
+{"intent": "remove", "text": "remove app from dock"}
+{"intent": "remove", "text": "应用先撤下"}
+{"intent": "remove", "text": "把这个图标扔掉"}
+{"intent": "remove", "text": "移走应用图标"}
+{"intent": "remove", "text": "隐藏应用入口"}
+{"intent": "remove", "text": "这个程序从底栏撤掉"}
+{"intent": "remove", "text": "应用别显示了"}
+{"intent": "remove", "text": "清掉应用入口"}
+{"intent": "remove", "text": "移除软件"}
+{"intent": "remove", "text": "把应用丢出去"}
+{"intent": "remove", "text": "不保留应用"}
+{"intent": "remove", "text": "取消固定应用"}
+{"intent": "remove", "text": "删掉应用"}
+{"intent": "move", "text": "把应用挪到最前面"}
+{"intent": "move", "text": "应用移到最后"}
+{"intent": "move", "text": "应用往左移"}
+{"intent": "move", "text": "应用放到另一个应用右边"}
+{"intent": "move", "text": "应用排在另一个应用之前"}
+{"intent": "move", "text": "应用拖到前面"}
+{"intent": "move", "text": "把图标调换位置"}
+{"intent": "move", "text": "调整应用顺序"}
+{"intent": "move", "text": "应用放在另一个应用后边"}
+{"intent": "move", "text": "move app left"}
+{"intent": "move", "text": "move app to end"}
+{"intent": "move", "text": "应用跟另一个应用交换"}
+{"intent": "move", "text": "把这个入口放左边"}
+{"intent": "move", "text": "应用向右挪一位"}
+{"intent": "move", "text": "把应用搬过去"}
+{"intent": "move", "text": "把应用排到第一位"}
+{"intent": "group", "text": "把应用归到办公"}
+{"intent": "group", "text": "应用放到游戏分类"}
+{"intent": "group", "text": "应用属于AI"}
+{"intent": "group", "text": "应用分到其他工具"}
+{"intent": "group", "text": "修改应用的分类"}
+{"intent": "group", "text": "归类应用"}
+{"intent": "group", "text": "应用算办公软件"}
+{"intent": "group", "text": "将应用归入游戏组"}
+{"intent": "group", "text": "把应用移入AI分组"}
+{"intent": "group", "text": "分类为工具"}
+{"intent": "group", "text": "group app as office"}
+{"intent": "group", "text": "应用换到办公类别"}
+{"intent": "group", "text": "把应用重新分组"}
+{"intent": "group", "text": "应用归到创作"}
+{"intent": "sort", "text": "按使用频率排序"}
+{"intent": "sort", "text": "智能整理一下dock"}
+{"intent": "sort", "text": "常用应用放前面"}
+{"intent": "sort", "text": "按使用时长排列"}
+{"intent": "sort", "text": "最常用的排左边"}
+{"intent": "sort", "text": "重新整理图标"}
+{"intent": "sort", "text": "分类排序"}
+{"intent": "sort", "text": "游戏分类放办公前面"}
+{"intent": "sort", "text": "AI分组排在游戏前面"}
+{"intent": "sort", "text": "先办公再游戏"}
+{"intent": "sort", "text": "sort by usage"}
+{"intent": "sort", "text": "把所有图标排整齐"}
+{"intent": "sort", "text": "帮我整理底栏"}
+{"intent": "sort", "text": "按常用程度自动排序"}
+{"intent": "sort", "text": "按使用习惯整理"}
+{"intent": "sort", "text": "重新排一下分类"}
+{"intent": "theme", "text": "换成深色风格"}
+{"intent": "theme", "text": "我想要浅色主题"}
+{"intent": "theme", "text": "改成磨砂玻璃"}
+{"intent": "theme", "text": "不要毛玻璃改石墨"}
+{"intent": "theme", "text": "换个简约外观"}
+{"intent": "theme", "text": "切换暗色"}
+{"intent": "theme", "text": "改成亮色样式"}
+{"intent": "theme", "text": "theme dark"}
+{"intent": "theme", "text": "theme light"}
+{"intent": "theme", "text": "石墨风格"}
+{"intent": "theme", "text": "把颜色调浅"}
+{"intent": "theme", "text": "更换皮肤"}
+{"intent": "theme", "text": "把外观换成磨砂"}
+{"intent": "theme", "text": "我喜欢黑色主题"}
+{"intent": "theme", "text": "给底座换一个风格"}
+{"intent": "theme", "text": "透明一些"}
+{"intent": "size", "text": "图标大一点"}
+{"intent": "size", "text": "dock小一点"}
+{"intent": "size", "text": "大小调到百分之八十"}
+{"intent": "size", "text": "把底栏放大"}
+{"intent": "size", "text": "图标缩小"}
+{"intent": "size", "text": "尺寸调整为100%"}
+{"intent": "size", "text": "图标有点大缩一缩"}
+{"intent": "size", "text": "把它变大一些"}
+{"intent": "size", "text": "size 120%"}
+{"intent": "size", "text": "make dock smaller"}
+{"intent": "size", "text": "放大到110%"}
+{"intent": "size", "text": "调整dock大小"}
+{"intent": "size", "text": "底栏太小了"}
+{"intent": "size", "text": "我想要大号图标"}
+{"intent": "size", "text": "把尺寸调小"}
+{"intent": "size", "text": "变得紧凑一点"}
+{"intent": "search", "text": "查找应用在哪里"}
+{"intent": "search", "text": "帮我找一下软件"}
+{"intent": "search", "text": "搜索应用"}
+{"intent": "search", "text": "定位应用的exe"}
+{"intent": "search", "text": "应用装在哪个目录"}
+{"intent": "search", "text": "读取这个快捷方式的目标"}
+{"intent": "search", "text": "找程序原文件"}
+{"intent": "search", "text": "这个快捷方式指向哪里"}
+{"intent": "search", "text": "应用可执行文件在哪里"}
+{"intent": "search", "text": "search app"}
+{"intent": "search", "text": "find app executable"}
+{"intent": "search", "text": "搜索已安装的软件"}
+{"intent": "search", "text": "打开应用的位置"}
+{"intent": "search", "text": "查看快捷方式指向"}
+{"intent": "search", "text": "寻找软件安装位置"}
+{"intent": "search", "text": "帮我看看应用路径"}
+{"intent": "autohide", "text": "开启自动隐藏"}
+{"intent": "autohide", "text": "dock自动收起"}
+{"intent": "autohide", "text": "不要自动收起"}
+{"intent": "autohide", "text": "关闭自动隐藏"}
+{"intent": "autohide", "text": "鼠标离开后隐藏"}
+{"intent": "autohide", "text": "一直显示dock"}
+{"intent": "autohide", "text": "autohide on"}
+{"intent": "autohide", "text": "autohide off"}
+{"intent": "autohide", "text": "取消自动收起"}
+{"intent": "autohide", "text": "让dock自动藏起来"}
+{"intent": "autohide", "text": "离开底栏就收起来"}
+{"intent": "autohide", "text": "总是显示底栏"}
+{"intent": "startup", "text": "开机自动启动"}
+{"intent": "startup", "text": "取消开机自启"}
+{"intent": "startup", "text": "登录后运行dock"}
+{"intent": "startup", "text": "不要随系统启动"}
+{"intent": "startup", "text": "打开开机启动"}
+{"intent": "startup", "text": "关闭自启动"}
+{"intent": "startup", "text": "start with windows"}
+{"intent": "startup", "text": "disable startup"}
+{"intent": "startup", "text": "开机就显示底栏"}
+{"intent": "startup", "text": "让它跟系统一起启动"}
+{"intent": "startup", "text": "不要自动运行"}
+{"intent": "startup", "text": "开机不启动dock"}
+{"intent": "widget", "text": "显示时钟小组件"}
+{"intent": "widget", "text": "隐藏桌面时钟"}
+{"intent": "widget", "text": "关闭小组件"}
+{"intent": "widget", "text": "打开小组件"}
+{"intent": "widget", "text": "不要时钟"}
+{"intent": "widget", "text": "show widget"}
+{"intent": "widget", "text": "hide clock"}
+{"intent": "widget", "text": "显示桌面组件"}
+{"intent": "widget", "text": "桌面那个时钟关掉"}
+{"intent": "widget", "text": "把时钟打开"}
+{"intent": "widget", "text": "小组件先不显示"}
+{"intent": "widget", "text": "我要桌面时钟"}
+{"intent": "tracking", "text": "开启使用统计"}
+{"intent": "tracking", "text": "关闭点击统计"}
+{"intent": "tracking", "text": "记录使用时长"}
+{"intent": "tracking", "text": "不要记录使用习惯"}
+{"intent": "tracking", "text": "暂停统计"}
+{"intent": "tracking", "text": "开启点击次数记录"}
+{"intent": "tracking", "text": "usage tracking on"}
+{"intent": "tracking", "text": "disable analytics"}
+{"intent": "tracking", "text": "别统计了"}
+{"intent": "tracking", "text": "开始记录应用活跃时间"}
+{"intent": "tracking", "text": "把本地统计关掉"}
+{"intent": "tracking", "text": "启用使用习惯学习"}
+{"intent": "undo", "text": "撤销刚才的操作"}
+{"intent": "undo", "text": "恢复上一步"}
+{"intent": "undo", "text": "刚才的改动不要了"}
+{"intent": "undo", "text": "撤销"}
+{"intent": "undo", "text": "undo"}
+{"intent": "undo", "text": "回到之前的状态"}
+{"intent": "undo", "text": "还原刚才的设置"}
+{"intent": "undo", "text": "把刚才删掉的恢复"}
+{"intent": "undo", "text": "我点错了还原一下"}
+{"intent": "undo", "text": "返回上一步"}
+{"intent": "undo", "text": "恢复刚才的排序"}
+{"intent": "undo", "text": "还原上一次改动"}
+{"intent": "help", "text": "你能做什么"}
+{"intent": "help", "text": "教我怎么用"}
+{"intent": "help", "text": "有什么功能"}
+{"intent": "help", "text": "帮助"}
+{"intent": "help", "text": "how to use"}
+{"intent": "help", "text": "help"}
+{"intent": "help", "text": "你支持哪些操作"}
+{"intent": "help", "text": "给几个例子"}
+{"intent": "help", "text": "操作指南"}
+{"intent": "help", "text": "怎么添加软件"}
+{"intent": "help", "text": "你是什么助手"}
+{"intent": "help", "text": "能帮我做哪些事"}
+{"intent": "unknown", "text": "今天天气怎么样"}
+{"intent": "unknown", "text": "帮我写一封邮件"}
+{"intent": "unknown", "text": "下载并安装游戏"}
+{"intent": "unknown", "text": "删除磁盘上所有文件"}
+{"intent": "unknown", "text": "卸载应用"}
+{"intent": "unknown", "text": "格式化硬盘"}
+{"intent": "unknown", "text": "执行powershell命令"}
+{"intent": "unknown", "text": "运行一段脚本"}
+{"intent": "unknown", "text": "发消息给同事"}
+{"intent": "unknown", "text": "购买一个软件"}
+{"intent": "unknown", "text": "帮我写代码"}
+{"intent": "unknown", "text": "登录我的账户"}
+{"intent": "unknown", "text": "清理系统注册表"}
+{"intent": "unknown", "text": "关机"}
+{"intent": "unknown", "text": "重启电脑"}
+{"intent": "unknown", "text": "你好"}
+{"intent": "unknown", "text": "讲一个笑话"}
+{"intent": "unknown", "text": "打开终端执行命令"}
+{"intent": "unknown", "text": "把文件上传服务器"}
+{"intent": "unknown", "text": "你是通用聊天模型吗"}
