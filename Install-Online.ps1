@@ -1,18 +1,15 @@
 ﻿$ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-$headers=@{'User-Agent'='dockbot-installer'}
-$releases=Invoke-RestMethod -Uri 'https://api.github.com/repos/nanhudev/dockbot/releases' -Headers $headers
-$release=$releases|Where-Object {!$_.draft -and ($_.assets.name -contains 'DockBot.exe') -and ($_.assets.name -contains 'DockBot.exe.sha256')}|Select-Object -First 1
-if(!$release){throw 'No packaged DockBot release is available.'}
+$release=Invoke-RestMethod -Uri 'https://raw.githubusercontent.com/nanhudev/dockbot/main/release.json'
+if($release.tag_name -notmatch '^v\d+\.\d+\.\d+(-[a-z0-9.]+)?$'){throw 'Invalid DockBot release manifest.'}
+$downloadRoot='https://github.com/nanhudev/dockbot/releases/download/'+$release.tag_name
 $legacy=Join-Path $env:LOCALAPPDATA 'FluidDock'
 $destination=Join-Path $env:LOCALAPPDATA 'Programs\DockBot'
 New-Item -ItemType Directory -Path $destination -Force|Out-Null
 $temporary=Join-Path $destination 'DockBot.exe.download'
-$asset=$release.assets|Where-Object name -eq 'DockBot.exe'|Select-Object -First 1
-$checksum=$release.assets|Where-Object name -eq 'DockBot.exe.sha256'|Select-Object -First 1
-Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile $temporary
-$response=(Invoke-WebRequest -UseBasicParsing -Uri $checksum.browser_download_url).Content
+Invoke-WebRequest -UseBasicParsing -Uri ($downloadRoot+'/DockBot.exe') -OutFile $temporary
+$response=(Invoke-WebRequest -UseBasicParsing -Uri ($downloadRoot+'/DockBot.exe.sha256')).Content
 $text=if($response -is [byte[]]){[Text.Encoding]::UTF8.GetString($response)}else{[string]$response}
 $expected=$text.Trim().Split(' ')[0]
 $algorithm=[Security.Cryptography.SHA256]::Create();$stream=[IO.File]::OpenRead($temporary)
